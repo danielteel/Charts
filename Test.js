@@ -1,4 +1,5 @@
-let {Point: Point, 
+let {
+  Point: Point, 
   Line: Line,
   ChartObject: ChartObject,
   LinearChart: LinearChart,
@@ -6,4 +7,8 @@ let {Point: Point,
   TrendChart: TrendChart,
   PolyChart: PolyChart,
   ChartTableEntry: ChartTableEntry,
-  ChartTable: ChartTable} = require(('./ChartObjects.js'));
+  ChartTable: ChartTable,
+  ChartInput: ChartInput,
+  ChartScript: ChartScript,
+  ChartConstant: ChartConstant
+ } = require(('./ChartObjects.js'));

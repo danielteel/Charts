@@ -556,6 +556,25 @@ class ChartTable extends ChartObject {
     }
 }
 
+class ChartInput extends ChartObject {
+    constructor(name="", script=""){
+        super(name, null);
+        this.script=script;
+    }
+}
+
+class ChartScript extends ChartObject {
+    constructor(name="", script=""){
+        super(name, null);
+        this.script=script;
+    }
+}
+
+class ChartConstant extends ChartObject {
+    constructor(name="", value=0){
+        super(name, value);
+    }
+}
 
 module.exports={Point: Point, 
                 Line: Line,
@@ -565,4 +584,8 @@ module.exports={Point: Point,
                 TrendChart: TrendChart,
                 PolyChart: PolyChart,
                 ChartTableEntry: ChartTableEntry,
-                ChartTable: ChartTable};
+                ChartTable: ChartTable,
+                ChartInput: ChartInput,
+                ChartScript: ChartScript,
+                ChartConstant: ChartConstant
+               };
