@@ -1,3 +1,5 @@
+const Interpreter = require('./Interpreter.js');
+
 ///helper functions
 
 //returns true if any of the inputs are null or undefined
@@ -215,8 +217,9 @@ class Segment {
 
 
 class ChartObject {
-    constructor(name="", initialValue=null){
+    constructor(name="", type="chartobject", initialValue=null){
         this.name=name;
+        this.type=type;
         this.value=initialValue;
     }
 
@@ -225,9 +228,8 @@ class ChartObject {
 }
 
 class LinearChart extends ChartObject {
-
     constructor(name="", yIsInputAxis=false, xOrYRefObj=null, zRefObj=null, lines=null){
-        super(name, null);
+        super(name, "linear", null);
 
         this.yIsInputAxis=yIsInputAxis;
 
@@ -296,7 +298,7 @@ class LinearChart extends ChartObject {
 class ClampChart extends ChartObject {
 
     constructor(name="", yIsInputAxis=false, xOrYRefObj=null, valueToClampRefObj=null, minLine=null, maxLine=null){
-        super(name, null);
+        super(name, "clamp", null);
 
         this.yIsInputAxis=yIsInputAxis;
 
@@ -342,7 +344,7 @@ class ClampChart extends ChartObject {
 
 class TrendChart extends ChartObject{
     constructor(name="", yIsInputAxis=false, xOrYRefObj=null, entryPointRefObj=null, exitPointRefObj=null, lines=null){
-        super(name, null);
+        super(name, "trend", null);
 
         this.yIsInputAxis=yIsInputAxis;
 
@@ -421,7 +423,7 @@ class TrendChart extends ChartObject{
 
 class PolyChart extends ChartObject{
     constructor(name="", xInRefObj=null, yInRefObj=null, lines=null){
-        super(name, null);
+        super(name, "poly", null);
 
         this.xInRefObj=xInRefObj;
         this.yInRefObj=yInRefObj;
@@ -499,7 +501,7 @@ class ChartTableEntry {
 
 class ChartTable extends ChartObject {
     constructor(name="", inputRefObj=null, table=null){
-        super(name, null);
+        super(name, "table", null);
 
         this.inputRefObj=inputRefObj;
 
@@ -558,21 +560,21 @@ class ChartTable extends ChartObject {
 
 class ChartInput extends ChartObject {
     constructor(name="", script=""){
-        super(name, null);
+        super(name, "input", null);
         this.script=script;
     }
 }
 
 class ChartScript extends ChartObject {
     constructor(name="", script=""){
-        super(name, null);
+        super(name, "script", null);
         this.script=script;
     }
 }
 
 class ChartConstant extends ChartObject {
     constructor(name="", value=0){
-        super(name, value);
+        super(name, "constant", value);
     }
 }
 

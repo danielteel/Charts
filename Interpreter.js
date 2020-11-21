@@ -15,46 +15,57 @@ const ERROR_WAS_IN = {
     EXECUTION: "execution"
 }
 
-class ROp {
-	static newCmpToConstant(objToCompare, constantToCompareTo){
-		return {type: 2, objToCompare: objToCompare, constantToCompareTo: constantToCompareTo};
-	}
 
-	static newJA(branch){
-		return {type: 3, branch: branch};
-	}
-
-	static newNeg(objToNeg){
-		return {type: 4, objToNeg: objToNeg};
-	}
-
-	static newLabel(id){
-		return {type: 5, id: id};
-	}
-
-	static newPush(objToPush){
-		return {type: 6, objToPush: objToPush};
-	}
-
-	static newPop(popIntoObj){
-		return {type: 7, popIntoObj: popIntoObj};
-	}
-
-	static newCmp(objA, objB){
-		return {type: 8, objA: objA, objB: objB};
+class Executable{
+	static negID=1;
+	static lblID=2;
+	static pushID=3;
+	static popID=4;
+	static cmpID=5;
+	static jaID=6;
+	static jbID=7;
+	static movID=8;
+	static trendID=9;
+	static linearID=10;
+	static polyID=11;
+	static clampID=12;
+	
+	static newOp(type, ...stuff){
+		let retObj={type: type};
+		for (let i=0;i<stuff.length;i++){
+			if (typeof stuff[i] !== "object" || Array.isArray(stuff[i])) stuff[i]={value: stuff[i]};
+			retObj["obj"+i]=stuff[i];
+		}
+		return retObj;
 	}	
-
-	static newJB(branch){
-		return {type: 9, branch: branch};
+	
+	constructor(){
+		this._opCodes=[];
+	}
+	
+	clear(){
+		this._opCodes=[];
 	}
 
-	static newMov(objA, objB){
-		return {type: 10, objA: objA, objB: objB};
+	getOpCodes(){
+		return [...this._opCodes];
 	}
+
+	newNeg(objToNeg){ this._opCodes.push(Executable.newOp(Executable.negID, objToNeg)); }
+	newLabel(labelId){ this._opCodes.push(Executable.newOp(Executable.lblID, labelId)); }
+	newPush(objToPush){ this._opCodes.push(Executable.newOp(Executable.pushID, objToPush)); }
+	newPop(popIntoThisObj){ this._opCodes.push(Executable.newOp(Executable.popID, popIntoThisObj)); }
+	newCmp(objA, objB){ this._opCodes.push(Executable.newOp(Executable.cmpID, objA, objB)); }
+	newJA(branch){ this._opCodes.push(Executable.newOp(Executable.jaID, branch));}
+	newJB(jumpToThisBranchId){ this._opCodes.push(Executable.newOp(Executable.jbID, jumpToThisBranchId)); }
+	newMov(recvObj, sendObj){ this._opCodes.push(Executable.newOp(Executable.movID, recvObj, sendObj)); }
+	newTrendCall(chart, objA, objB, objC){ this._opCodes.push(Executable.newOp(Executable.trendID, objA, objB, objC)); }
+	newLinearCall(chart, objA, objB){ this._opCodes.push(Executable.newOp(Executable.linearID, objA, objB)); }
+	newPolyCall(chart, objA, objB){ this._opCodes.push(Executable.newOp(Executable.polyID, objA, objB)); }
+	newClampCall(chart, objA, objB){ this._opCodes.push(Executable.newOp(Executable.clampID, objA, objB)); }
 }
 
 class Interpreter {
-
     constructor(code){
         this.errorString="";
         this.errorCodeLine=0;
@@ -69,10 +80,12 @@ class Interpreter {
 		
 		this.branchCounter=0;
 
-		this.eax={value:0};
-		this.ebx={value:0};
-		this.ecx={value:0};
+		this.eax=0;
+		this.ebx=0;
+		this.ecx=0;
+		this.returnedValue=0;
 
+		this.program = new Executable();
     }
 
     set code(value){
@@ -93,12 +106,12 @@ class Interpreter {
     }
 
     isDigit(character){
-        if ("0123456789".indexOf(character)>=0) return true;
+        if ("0123456789".indexOf(character)>=0) return true;//TODO make more efficient
         return false;
     }
 
     isAlpha(character){
-        if ("abcdefghijklmnopqrstuvwxyz".indexOf(character.toLowerCase())>=0) return true;
+        if ("abcdefghijklmnopqrstuvwxyz".indexOf(character.toLowerCase())>=0) return true;//TODO make more efficient
         return false;
 	}
 	
@@ -246,7 +259,7 @@ class Interpreter {
 			return false;
 		}
 		name=name.toLowerCase();
-		this.setToken(TokenType.ChartCall,name);
+		this.setToken(TokenType.ChartCall, name);
 		return true;
 	}
 	
@@ -435,10 +448,10 @@ class Interpreter {
 		if (!this.match(TokenType.FuncAbs)) return false;
 		if (!this.match(TokenType.LeftParen)) return false;
 		if (!doExpression()) return false;
-		this.addOp(ROp.newCmpToConstant(this.eax, 0));
-		this.addOp(ROp.newJA(ifPosBranch));
-		this.addOp(ROp.newNeg(this.eax));
-		this.addOp(ROp.newLabel(ifPosBranch));
+		this.program.newCmp(this.eax, 0);
+		this.program.newJA(ifPosBranch);
+		this.program.newNeg(this.eax);
+		this.program.newLabel(ifPosBranch);
 		if (!this.match(TokenType.RightParen)) return false;
 		return true;
 	}
@@ -448,14 +461,14 @@ class Interpreter {
 		if (!this.match(TokenType.FuncMin)) return false;
 		if (!this.match(TokenType.LeftParen)) return false;
 		if (!this.doExpression()) return false;
-		this.addOp(ROp.newPush(this.eax));
+		this.program.newPush(this.eax);
 		if (!this.match(TokenType.Comma)) return false;
 		if (!this.doExpression()) return false;
-		this.addOp(ROp.newPop(this.ebx));
-		this.addOp(ROp.newCmp(this.eax, this.ebx));
-		this.addOp(ROp.newJB(compareBranch));
-		this.addOp(ROp.newMov(this.eax, this.ebx));
-		this.addOp(ROp.newLabel(compareBranch));
+		this.program.newPop(this.ebx);
+		this.program.newCmp(this.eax, this.ebx);
+		this.program.newJB(compareBranch);
+		this.program.newMov(this.eax, this.ebx);
+		this.program.newLabel(compareBranch);
 		if (!this.match(TokenType.RightParen)) return false;
 		return true;
 	}
@@ -465,107 +478,127 @@ class Interpreter {
 		if (!this.match(TokenType.FuncMax)) return false;
 		if (!this.match(TokenType.LeftParen)) return false;
 		if (!this.doExpression()) return false;
-		this.addOp(ROp.newPush(this.eax));
+		this.program.newPush(this.eax);
 		if (!this.match(TokenType.Comma)) return false;
 		if (!this.doExpression()) return false;
-		this.addOp(ROp.newPop(this.ebx));
-		this.addOp(ROp.newCmp(this.eax, this.ebx));
-		this.addOp(ROp.newJA(compareBranch));
-		this.addOp(ROp.newMov(this.eax, this.ebx));
-		this.addOp(ROp.newLabel(compareBranch));
+		this.program.newPop(this.ebx);
+		this.program.newCmp(this.eax, this.ebx);
+		this.program.newJA(compareBranch);
+		this.program.newMov(this.eax, this.ebx);
+		this.program.newLabel(compareBranch);
 		if (!this.match(TokenType.RightParen)) return false;
 		return true;
 	}
-}
 
+	doClamp(){
+		let compareBranch = this.newBranch();
+		let compareBranch2 = this.newBranch();
+		if (!this.match(TokenType.FuncClamp)) return false;
+		if (!this.match(TokenType.LeftParen)) return false;
+		if (!this.doExpression()) return false;
+		this.program.newPush(this.eax);
+		if (!this.match(TokenType.Comma)) return false;
+		if (!this.doExpression()) return false;
+		this.program.newPop(this.ebx);
+		this.program.newCmp(this.eax, this.ebx);
+		this.program.newJA(compareBranch);
+		this.program.newMov(this.eax, this.ebx);
+		this.program.newLabel(compareBranch);
+		this.program.newPush(this.eax);
+		if (!this.match(TokenType.Comma)) return false;
+		if (!this.doExpression()) return false;
+		this.program.newPop(this.ebx);
+		this.program.newCmp(this.eax, this.ebx);
+		this.program.newJB(compareBranch2);
+		this.program.newMov(this.eax, this.ebx);
+		this.program.newLabel(compareBranch2);
+		if (!this.match(TokenType.RightParen)) return false;
+		return true;
+	}
 
-bool Interpreter::doClamp() {
-	BranchID compareBranch = newBranch();
-	BranchID compareBranch2 = newBranch();
-	if (!match(TokenType::FuncClamp)) return false;
-	if (!match(TokenType::LeftParen)) return false;
+	doChartCall(){
+		let chartObj=this.getChartObject(this.token.value);//TODO implement getChartObject
+		if (!chartObj){
+			this.errorString="Chart object '"+this.token.value+"' doesnt exist";
+			return false;
+		}
+		
+		let isTrend = chartObj.type==="trend";
+		let isLinear = chartObj.type==="linear";
+		let isPoly = chartObj.type==="poly";
+		let isClamp = chartObj.type==="clamp";
 
-	if (!doExpression()) return false;
-	addOp(ROperation::newPush(errorCodeLine, &eax));
+		if (!(isTrend || isLinear || isPoly || isClamp)){
+			this.errorString="Chart object '"+this.token.value+"' is not a chart!";
+			return false;
+		}
 
-	if (!match(TokenType::Comma)) return false;
+		if (!this.match(TokenType.ChartCall)) return false;
+		if (!this.match(TokenType.LeftParen)) return false;
 
-	if (!doExpression()) return false;
-	addOp(ROperation::newPop(errorCodeLine, &ebx));
-	addOp(ROperation::newCmp(errorCodeLine, &eax, &ebx));
-	addOp(ROperation::newJA(errorCodeLine, compareBranch));
-	addOp(ROperation::newMov(errorCodeLine, &eax, &ebx));
-	addOp(ROperation::newLabel(errorCodeLine, compareBranch));
-	addOp(ROperation::newPush(errorCodeLine, &eax));
+		let inputCount = isTrend ? 3 : 2;
 
-	if (!match(TokenType::Comma)) return false;
+		for (let i = 0; i < inputCount; i++) {
+			if (!this.doExpression()) return false;
+			if (i < inputCount - 1) {
+				this.program.newPush(this.eax);
+				if (!this.match(TokenType.Comma)) return false;
+			}
+		}
+		if (!this.match(TokenType.RightParen)) return false;
 
-	if (!doExpression()) return false;
-	addOp(ROperation::newPop(errorCodeLine, &ebx));
-	addOp(ROperation::newCmp(errorCodeLine, &eax, &ebx));
-	addOp(ROperation::newJB(errorCodeLine, compareBranch2));
-	addOp(ROperation::newMov(errorCodeLine, &eax, &ebx));
-	addOp(ROperation::newLabel(errorCodeLine, compareBranch2));
+		this.program.newPop(this.ebx);
+		if (isTrend){
+			this.program.newPop(this.ecx);
+			this.program.newTrendCall(chartObj, this.ecx, this.ebx, this.eax);
+		} else if (isLinear){
+			this.program.newLinearCall(chartObj, this.ebx, this.eax);
+		} else if (isPoly){
+			this.program.newPolyCall(chartObj, this.ebx, this.eax);
+		} else if (isClamp){
+			this.program.newClampCall(chartObj, this.ebx, this.eax);
+		}
 
-	if (!match(TokenType::RightParen)) return false;
-	return true;
-}
+		return true;
+	}
 
-bool Interpreter::doChartCall() {
-	TChartCall* chartCall = reinterpret_cast<TChartCall*>(token);
-	if (!chartCall) {
-		errorString = "Null chart call";
+	doFactor(){
+		switch (this.token.type){
+		case TokenType.Nil:
+			this.program.newMov(this.eax, null);
+			return this.match(TokenType.Nil);
+		case TokenType.This:
+			this.program.newMov(this.eax, this.returnedValue);
+			return this.match(TokenType.This);
+		case TokenType.Constant:
+			if (typeof this.token.value !== "number"){
+				this.errorString = "Null constant";
+				return false;
+			}
+			this.program.newMov(this.eax, this.token.value);
+			return match(TokenType.Constant);
+		case TokenType.Ident:
+		case TokenType.ChartCall:
+		case TokenType.LeftParen:
+		case TokenType.Minus:
+		case TokenType.True:
+		case TokenType.False:
+		case TokenType.Not:
+		case TokenType.FuncBoolIsNil:
+		case TokenType.FuncAbs:
+			return this.doAbs();
+		case TokenType.FuncClamp:
+			return this.doClamp();
+		case TokenType.FuncMin:
+			return this.doMin();
+		case TokenType.FuncMax:
+			return this.doMax();
+		}
+		this.errorString = "Expected factor but found "+this.token.type+":"+this.token.value;
 		return false;
 	}
-
-	ChartFunction* chartFunction = getChartFunction(chartCall->name);
-	if (!chartFunction) {
-		errorString = "Chart doesnt exist '" + chartCall->name + "'";
-		return false;
-	}
-
-	string chartCallName = chartCall->name;
-
-	chartCall = nullptr;
-
-	bool isTrend = chartFunction->chartBase->type == ChartObjectType::TrendChart;
-	bool isLinear = chartFunction->chartBase->type == ChartObjectType::LinearChart;
-	bool isPoly = chartFunction->chartBase->type == ChartObjectType::PolyChart;
-	bool isClamp = chartFunction->chartBase->type == ChartObjectType::ClampChart;
-
-	int inputCount = 2;
-	if (isTrend) {
-		inputCount = 3;
-	}
-
-	if (!match(TokenType::ChartCall)) return false;
-	if (!match(TokenType::LeftParen)) return false;
-	for (int i = 0; i < inputCount; i++) {
-		if (!doExpression()) return false;
-		if (i < inputCount - 1) {
-			addOp(ROperation::newPush(errorCodeLine, &eax));
-			if (!match(TokenType::Comma)) return false;
-		}
-	}
-	if (!match(TokenType::RightParen)) return false;
-
-	addOp(ROperation::newPop(errorCodeLine, &ebx));
-	if (isTrend) {
-		addOp(ROperation::newPop(errorCodeLine, &ecx));
-		addOp(ROperation::newTrendChartCall(errorCodeLine, chartFunction->chartBase, &ecx, &ebx, &eax));
-	} else {
-		if (isLinear) {
-			addOp(ROperation::newLinearChartCall(errorCodeLine, chartFunction->chartBase, &ebx, &eax));
-		}
-		if (isPoly) {
-			addOp(ROperation::newPolyChartCall(errorCodeLine, chartFunction->chartBase, &ebx, &eax));
-		}
-		if (isClamp) {
-			addOp(ROperation::newClampChartCall(errorCodeLine, chartFunction->chartBase, &ebx, &eax));
-		}
-	}
-	return true;
 }
+
 
 
 bool Interpreter::doFactor() {
