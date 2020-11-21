@@ -29,6 +29,12 @@ class Executable{
 	static linearID=10;
 	static polyID=11;
 	static clampID=12;
+	static notID=13;
+	static exponentID=14;
+	static mulID=15;
+	static divID=16;
+	static addID=17;
+	static subID=18;
 	
 	static newOp(type, ...stuff){
 		let retObj={type: type};
@@ -59,10 +65,16 @@ class Executable{
 	newJA(branch){ this._opCodes.push(Executable.newOp(Executable.jaID, branch));}
 	newJB(jumpToThisBranchId){ this._opCodes.push(Executable.newOp(Executable.jbID, jumpToThisBranchId)); }
 	newMov(recvObj, sendObj){ this._opCodes.push(Executable.newOp(Executable.movID, recvObj, sendObj)); }
-	newTrendCall(chart, objA, objB, objC){ this._opCodes.push(Executable.newOp(Executable.trendID, objA, objB, objC)); }
-	newLinearCall(chart, objA, objB){ this._opCodes.push(Executable.newOp(Executable.linearID, objA, objB)); }
-	newPolyCall(chart, objA, objB){ this._opCodes.push(Executable.newOp(Executable.polyID, objA, objB)); }
-	newClampCall(chart, objA, objB){ this._opCodes.push(Executable.newOp(Executable.clampID, objA, objB)); }
+	newTrendCall(chart, returnObj, objA, objB, objC){ this._opCodes.push(Executable.newOp(Executable.trendID, returnObj, objA, objB, objC)); }
+	newLinearCall(chart, returnObj, objA, objB){ this._opCodes.push(Executable.newOp(Executable.linearID, returnObj, objA, objB)); }
+	newPolyCall(chart, returnObj, objA, objB){ this._opCodes.push(Executable.newOp(Executable.polyID, returnObj, objA, objB)); }
+	newClampCall(chart, returnObj, objA, objB){ this._opCodes.push(Executable.newOp(Executable.clampID, returnObj, objA, objB)); }
+	newNot(objToNot){ this._opCodes.push(Executable.newOp(Executable.notID, objToNot)); }
+	newExponent(recvObj, exponentObj){ this._opCodes.push(Executable.newOp(Executable.exponentID, recvObj, exponentObj)); }
+	newMul(recvObj, multiplyByObj){ this._opCodes.push(Executable.newOp(Executable.mulID, recvObj, multiplyByObj)); }
+	newDiv(recvObj, divideByObj){ this._opCodes.push(Executable.newOp(Executable.divID, recvObj, divideByObj)); }
+	newAdd(recvObj, addThisObj){ this._opCodes.push(Executable.newOp(Executable.addID, recvObj, addThisObj)); }
+	newSub(recvObj, subtractThisObj){ this._opCodes.push(Executable.newOp(Executable.subID, recvObj, subtractThisObj)); }
 }
 
 class Interpreter {
@@ -99,6 +111,8 @@ class Interpreter {
     getPhaseOfError(){ return this.errorWasDuring; }
     getErrorMessage(){ return this.errorString; }
     getErrorLine(){ return this.errorLine;}
+
+	setError(msg){this.errorString=msg; return false}
 
     setToken(type, value=null){
         this.token.type=token;
@@ -161,10 +175,8 @@ class Interpreter {
             if (notDone===true) this.getChar();
         }
         
-        if (num.length < 2 && hasDec === true) {
-            this.errorString = "Expected number but found lone decimal.";
-            return false;
-        }
+        if (num.length < 2 && hasDec === true) return this.setError("Expected number but found lone decimal.");
+    
 
         this.setToken(TokenType.Constant,Number(num));
         return true;
@@ -178,10 +190,7 @@ class Interpreter {
             this.getChar();
         }
         if (this.isNotEnd()){
-            if (this.look !== '"') {
-                this.errorString = "Expected string but found end of code.";
-                return false;
-            }
+            if (this.look !== '"') return this.setError("Expected string but found end of code.");
         }
         this.getChar();
         this.setToken(TokenType.String, str);
@@ -198,11 +207,10 @@ class Interpreter {
                 notDone = true;
                 this.getChar();
             }
-        }
-        if (name.length=== 0) {
-            this.errorString = "Expected identifier but got nothing";
-            return false;
-        }
+		}
+		
+		if (name.length === 0) return this.setError("Expected identifier but got nothing");
+		
         name=name.toLowerCase();
         if (name === "if") {
             this.setToken(TokenType.If);
@@ -254,10 +262,9 @@ class Interpreter {
 				this.getChar();
 			}
 		}
-		if (name.length === 0) {
-			this.errorString = "Expected chart name but got nothing";
-			return false;
-		}
+
+		if (name.length === 0) return this.setError("Expected chart name but got nothing");
+
 		name=name.toLowerCase();
 		this.setToken(TokenType.ChartCall, name);
 		return true;
@@ -311,8 +318,7 @@ class Interpreter {
 						this.getChar();
 						this.setToken(TokenType.Or);
 					} else {
-						this.errorString = "Incomplete OR operator found, OR operators must be of boolean type '||'";
-						return false;
+						return this.setError("Incomplete OR operator found, OR operators must be of boolean type '||'");
 					}
 					break;
 				case '&':
@@ -320,8 +326,7 @@ class Interpreter {
 						this.getChar();
 						this.setToken(TokenType.And);
 					} else {
-						this.errorString = "Incomplete AND operator found, AND operators must be of boolean type '&&'";
-						return false;
+						return this.setError("Incomplete AND operator found, AND operators must be of boolean type '&&'");
 					}
 					break;
 				case '+':
@@ -380,9 +385,7 @@ class Interpreter {
 					this.setToken(TokenType.Comma);
 					break;
 				default:
-					this.errorString = "Unexpected symbol found, ";
-					this.errorString += symbol;
-					return false;
+					return this.setError("Unexpected symbol found, "+symbol);
 				}
 			}
 		}
@@ -397,8 +400,7 @@ class Interpreter {
 		if (this.token.type === type) {
 			return this.next();
 		}
-		this.errorString = "Expected token type "+ type + " but found "+this.token.type+" instead";
-		return false;
+		return this.setError("Expected token type "+ type + " but found "+this.token.type+" instead");
 	}
 
 	newBranch(){
@@ -516,22 +518,31 @@ class Interpreter {
 		return true;
 	}
 
+	doIsNil(){
+		if (!this.match(TokenType.FuncBoolIsNil)) return false;
+		if (!this.match(TokenType.LeftParen)) return false;
+
+		let identObj = this.getIdentObject(this.token.value);
+		if (!identObj) return this.setError(this.token.value+" doesnt exist!");
+
+		this.program.newIsNil(identObj);
+
+		if (!this.match(TokenType.Ident)) return false;
+		if (!this.match(TokenType.RightParen)) return false;
+
+		return true;
+	}
+
 	doChartCall(){
 		let chartObj=this.getChartObject(this.token.value);//TODO implement getChartObject
-		if (!chartObj){
-			this.errorString="Chart object '"+this.token.value+"' doesnt exist";
-			return false;
-		}
-		
+		if (!chartObj) return this.setError("Chart object '"+this.token.value+"' doesnt exist");
+
 		let isTrend = chartObj.type==="trend";
 		let isLinear = chartObj.type==="linear";
 		let isPoly = chartObj.type==="poly";
 		let isClamp = chartObj.type==="clamp";
 
-		if (!(isTrend || isLinear || isPoly || isClamp)){
-			this.errorString="Chart object '"+this.token.value+"' is not a chart!";
-			return false;
-		}
+		if (!(isTrend || isLinear || isPoly || isClamp)) return this.setError("Chart object '"+this.token.value+"' is not a chart!");
 
 		if (!this.match(TokenType.ChartCall)) return false;
 		if (!this.match(TokenType.LeftParen)) return false;
@@ -550,16 +561,24 @@ class Interpreter {
 		this.program.newPop(this.ebx);
 		if (isTrend){
 			this.program.newPop(this.ecx);
-			this.program.newTrendCall(chartObj, this.ecx, this.ebx, this.eax);
+			this.program.newTrendCall(chartObj, this.eax, this.ecx, this.ebx, this.eax);
 		} else if (isLinear){
-			this.program.newLinearCall(chartObj, this.ebx, this.eax);
+			this.program.newLinearCall(chartObj, this.eax, this.ebx, this.eax);
 		} else if (isPoly){
-			this.program.newPolyCall(chartObj, this.ebx, this.eax);
+			this.program.newPolyCall(chartObj, this.eax, this.ebx, this.eax);
 		} else if (isClamp){
-			this.program.newClampCall(chartObj, this.ebx, this.eax);
+			this.program.newClampCall(chartObj, this.eax, this.ebx, this.eax);
 		}
 
 		return true;
+	}
+
+	doIdent(){
+		let identName = this.token.value;
+		let identObj = this.getIdentObject(identName);
+		if (!identObj) return this.setError("Identifier doesnt exist '"+identName+"!");
+		this.program.newMov(this.eax, identObj);
+		return this.match(TokenType.Ident);
 	}
 
 	doFactor(){
@@ -571,20 +590,36 @@ class Interpreter {
 			this.program.newMov(this.eax, this.returnedValue);
 			return this.match(TokenType.This);
 		case TokenType.Constant:
-			if (typeof this.token.value !== "number"){
-				this.errorString = "Null constant";
-				return false;
-			}
+			if (typeof this.token.value !== "number") return this.setError("Null constant");
 			this.program.newMov(this.eax, this.token.value);
 			return match(TokenType.Constant);
 		case TokenType.Ident:
+			return this.doIdent();
 		case TokenType.ChartCall:
+			return this.doChartCall();
 		case TokenType.LeftParen:
+			if (!this.match(TokenType.LeftParen)) return false;
+			if (!this.doExpression()) return false;
+			if (!this.match(TokenType.RightParen)) return false;
+			return true;
 		case TokenType.Minus:
+			if (!this.match(TokenType.Minus)) return false;
+			if (!this.doFactor()) return false;
+			this.program.newNeg(this.eax);
+			return true;
 		case TokenType.True:
+			this.program.newMov(this.eax, true);
+			return this.match(TokenType.True);
 		case TokenType.False:
+			this.program.newMov(this.eax, false);
+			return this.match(TokenType.False);
 		case TokenType.Not:
+			if (!this.match(TokenType.Not)) return false;
+			if (!this.doFactor()) return false;
+			this.program.newNot(this.eax);
+			return true;
 		case TokenType.FuncBoolIsNil:
+			return this.doIsNil();
 		case TokenType.FuncAbs:
 			return this.doAbs();
 		case TokenType.FuncClamp:
@@ -594,146 +629,27 @@ class Interpreter {
 		case TokenType.FuncMax:
 			return this.doMax();
 		}
-		this.errorString = "Expected factor but found "+this.token.type+":"+this.token.value;
-		return false;
+		return this.setError("Expected factor but found "+this.token.type+":"+this.token.value);
 	}
-}
 
-
-
-bool Interpreter::doFactor() {
-	if (token) {
-		switch (token->type) {
-		case TokenType::Nil:
-			addOp(ROperation::newLoad(errorCodeLine, &eax, nullopt));
-			return match(TokenType::Nil);
-
-		case TokenType::This:
-			addOp(ROperation::newGetThis(errorCodeLine));
-			return match(TokenType::This);
-
-		case TokenType::Constant:
-			{
-				TConstant* constant = reinterpret_cast<TConstant*>(token);
-				if (constant) {
-					addOp(ROperation::newLoad(errorCodeLine, &eax, constant->value));
-				} else {
-					errorString = "Null constant";
-					return false;
-				}
+	doPower(){
+		if (!this.doFactor()) return false;
+		while (this.isPowerOp()){
+			this.program.newPush(this.eax);
+			switch (this.token.type){
+			case TokenType.Exponent:
+				if (!this.match(TokenType.Exponent)) return false;
+				if (!this.doFactor()) return false;
+				this.program.newMov(this.ebx, this.eax);
+				this.program.newPop(this.eax);
+				this.program.newPower(this.eax, this.ebx);
+				break;
 			}
-			return match(TokenType::Constant);
-
-		case TokenType::Ident:
-			{
-				TIdent* ident = reinterpret_cast<TIdent*>(token);
-				if (ident) {
-					Variable* variable = getVariable(ident->name);
-					if (variable) {
-						addOp(ROperation::newMov(errorCodeLine, &eax, &variable->value));
-					} else {
-						errorString = "Variable doesnt exist '" + ident->name + "'";
-						return false;
-					}
-				} else {
-					errorString = "Null identifier";
-					return false;
-				}
-			}
-			return match(TokenType::Ident);
-
-		case TokenType::ChartCall:
-			return doChartCall();
-
-		case TokenType::LeftParen:
-			if (!match(TokenType::LeftParen)) return false;
-			if (!doExpression()) return false;
-			if (!match(TokenType::RightParen)) return false;
-			return true;
-
-		case TokenType::Minus:
-			if (!match(TokenType::Minus)) return false;
-			if (token) {
-				if (!doFactor()) return false;
-				addOp(ROperation::newNeg(errorCodeLine, &eax));
-				return true;
-			}
-			errorString = "Unary minus expects a factor";
-			return false;
-
-		case TokenType::True:
-			addOp(ROperation::newSet(errorCodeLine, &eax));
-			return match(TokenType::True);
-
-		case TokenType::False:
-			addOp(ROperation::newClear(errorCodeLine, &eax));
-			return match(TokenType::False);
-
-		case TokenType::Not:
-			if (!match(TokenType::Not)) return false;
-			if (token) {
-				if (!doFactor()) return false;
-				addOp(ROperation::newNotOp(errorCodeLine, &eax));
-				return true;
-			}
-			errorString = "Unary not expects a factor";
-			return false;
-
-		case TokenType::FuncBoolIsNil:
-			{
-				if (!match(TokenType::FuncBoolIsNil)) return false;
-				if (!match(TokenType::LeftParen)) return false;
-				TIdent* ident = reinterpret_cast<TIdent*>(token);
-				if (ident == nullptr) {
-					errorString = "IsNil ident is null";
-					return false;
-				}
-				if (token->type != TokenType::Ident) {
-					errorString = "IsNil expects an identifier but found " + (token != nullptr ? tokenTypeToString(token->type) : "nulltoken");
-					return false;
-				}
-				Variable* variable = getVariable(ident->name);
-				if (variable == nullptr) {
-					errorString = ident->name + " variable doesnt exist!";
-					return false;
-				}
-				addOp(ROperation::newIsNil(errorCodeLine, &eax, &variable->value));
-				if (!match(TokenType::Ident)) return false;
-				if (!match(TokenType::RightParen)) return false;
-			}
-			return true;
-
-		case TokenType::FuncAbs:
-			return doAbs();
-		case TokenType::FuncClamp:
-			return doClamp();
-		case TokenType::FuncMax:
-			return doMax();
-		case TokenType::FuncMin:
-			return doMin();
 		}
+		return true;
 	}
-	errorString = "Expected factor but found "+ (token!=nullptr ? tokenTypeToString(token->type) : "nulltoken");
-	return false;
 }
 
-
-bool Interpreter::doPower() {
-	if (!doFactor()) return false;
-	while (isPowerOp()) {
-		addOp(ROperation::newPush(errorCodeLine, &eax));
-		switch (token->type) {
-		case TokenType::Exponent:
-			if (!match(TokenType::Exponent)) return false;
-			if (!doFactor()) return false;
-			addOp(ROperation::newMov(errorCodeLine, &ebx, &eax));
-			addOp(ROperation::newPop(errorCodeLine, &eax));
-			addOp(ROperation::newPower(errorCodeLine, &eax, &ebx));
-			break;
-		}
-	}
-	return true;
-}
 
 bool Interpreter::doTerm() {
 	if (!doPower()) return false;
