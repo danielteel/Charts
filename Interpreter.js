@@ -47,6 +47,8 @@ class Executable{
 	static jneID=28;
 	static testID=29;
 	static jmpID=30;
+	static retID=31;
+	static msgboxID=32;
 	
 	static newOp(type, codeLine, ...stuff){
 		let retObj={type: type, codeLine: codeLine};
@@ -64,6 +66,7 @@ class Executable{
 	
 	clear(){
 		this._opCodes=[];
+		this.currentCodeLine=1;
 	}
 
 	getOpCodes(){
@@ -100,19 +103,24 @@ class Executable{
 	newJNE(jumpToThisBranchId) {this._opCodes.push(Executable.newOp(Executable.jneID, this.currentCodeLine, jumpToThisBranchId));}
 	newTest(testObj) {this._opCodes.push(Executable.newOp(Executable.testID, this.currentCodeLine, testObj));}
 	newJmp(jumpToThisBranchId) {this._opCodes.push(Executable.newOp(Executable.testID, this.currentCodeLine, jumpToThisBranchId));}
+	newRet() {this._opCodes.push(Executable.newOp(Executable.retID, this.currentCodeLine));}
+	newMsgBox(stringToShow) {this._opCodes.push(Executable.newOp(Executable.msgboxID, this.currentCodeLine, stringToShow));}
 }
 
 class Interpreter {
-    constructor(code){
+    constructor(owningChartObject, code){
         this.errorString="";
         this.errorCodeLine=0;
         this.errorWasDuring=ERROR_WAS_IN.COMPILE;
+
+		this.variables=[];
 
         this.token={type: null, value: null};
 
         this.look="";
         this.lookIndex=0;
-        this.codeEndIndex=0;
+		this.codeEndIndex=0;
+		this._code="";
 		this.code=code;
 		
 		this.branchCounter=0;
@@ -120,7 +128,10 @@ class Interpreter {
 		this.eax=0;
 		this.ebx=0;
 		this.ecx=0;
-		this.returnedValue=0;
+		this.returnedValue={value: null};
+
+		this.chartObjectArray=[];
+		this.owningChartObject=owningChartObject;
 
 		this.program = new Executable();
     }
@@ -825,282 +836,147 @@ class Interpreter {
 		this.program.newLabel(endLabel);
 		return true;
 	}
-}
 
-
-bool Interpreter::doBreak(optional<BranchID> breakToBranch) {
-	if (match(TokenType::Break)) {
-		
-		if (breakToBranch == nullopt) {
-			errorString = "No loop to 'break' from.";
-			return false;
-		}
-
-		addOp(ROperation::newJmp(errorCodeLine, *breakToBranch));
-
-		return (match(TokenType::LineDelim));
+	doBreak(breakToBranch){
+		if (!this.match(TokenType.Break)) return false;
+		if (breakToBranch===null || breakToBranch===undefined) return this.setError("No loop to break from.");
+		this.program.newJmp(breakToBranch);
+		return this.match(TokenType.LineDelim);
 	}
-	return false;
-}
 
-bool Interpreter::doReturn() {
-	if (match(TokenType::Return)) {
-		if (!doExpression()) return false;
-		
-		addOp(ROperation::newRet(errorCodeLine));
-
-		return (match(TokenType::LineDelim));
+	doReturn(){
+		if (!this.match(TokenType.Return)) return false;
+		if (!this.doExpression()) return false;
+		this.program.newRet();
+		return this.match(TokenType.LineDelim);
 	}
-	return false;
-}
 
-bool Interpreter::doDouble() {
-	if (match(TokenType::Double)) {
-		if (token && token->type == TokenType::Ident) {
-			bool notDone = true;
-			while (notDone) {
-				notDone = false;
-				TIdent* ident = reinterpret_cast<TIdent*>(token);
-				if (!addVariable(ident->name, false, nullopt)) return false;
-				string identName = ident->name;
-				if (!match(TokenType::Ident)) return false;
-				if (token && token->type == TokenType::Assignment) {
-					if (!doAssignmentWithName(identName)) return false;
-				}
-				if (token && token->type == TokenType::Comma) {
-					if (!match(TokenType::Comma)) return false;
-					notDone = true;
-				}
+	doDouble(){
+		if (!this.match(TokenType.Double)) return false;
+		if (this.token.type!==TokenType.Ident) return this.setError("Expected identifier but found "+this.token.value);
+		let notDone=true;
+		while (notDone){
+			notDone=false;
+			varName = this.token.value;
+			if (!addVariable(varName, false, null)) return false;
+			if (!this.match(TokenType.Ident)) return false;
+			if (this.token.type === TokenType.Assignment){
+				if (!this.doAssignmentWithName(varName)) return false;
 			}
-			return (match(TokenType::LineDelim));
-		} else {
-			errorString = "Expected idenfitifer but found "+ (token != nullptr ? tokenTypeToString(token->type) : "nulltoken");
-			return false;
-		}
-	}
-	return false;
-}
-
-bool Interpreter::doAssignmentWithName(string identName) {
-	Variable* variable = getVariable(identName);
-	if (!variable) {
-		errorString = identName + " variable doesnt exist!";
-		return false;
-	}
-	if (variable->isConstant) {
-		errorString = identName + " is a constant, you cant assign anything to it!";
-		return false;
-	}
-	if (!match(TokenType::Assignment)) return false;
-
-	if (!doExpression()) return false;
-
-	addOp(ROperation::newMov(errorCodeLine, &variable->value, &eax));
-
-	return true;
-}
-
-bool Interpreter::doAssignment() {
-	TIdent* ident = reinterpret_cast<TIdent*>(token);
-	if (!ident) {
-		errorString = "Null ident token";
-		return false;
-	}
-	string identName = ident->name;
-	ident = nullptr;
-
-	if (match(TokenType::Ident)) {
-		if (!doAssignmentWithName(identName)) return false;
-		return (match(TokenType::LineDelim));
-	}
-	return false;
-}
-
-bool Interpreter::doBlock(optional<BranchID> breakToBranch, bool ifWantsRightCurly) {
-	while (token) {
-		switch (token->type) {
-		case TokenType::If:
-			if (!doIf(breakToBranch)) return false;
-			break;
-
-		case TokenType::While:
-			if (!doWhile(breakToBranch)) return false;
-			break;
-
-		case TokenType::Break:
-			if (!doBreak(breakToBranch)) return false;
-			break;
-
-		case TokenType::Return:
-			if (!doReturn()) return false;
-			break;
-
-		case TokenType::Double:
-			if (!doDouble()) return false;
-			break;
-
-		case TokenType::MsgBox:
-			{
-				if (!match(TokenType::MsgBox)) return false;
-				if (token->type != TokenType::String) {
-					match(TokenType::String);
-					return false;
-				}
-				TString* strToken = reinterpret_cast<TString*>(token);
-				if (strToken) {
-					string* str = newPoolString(strToken->str);
-					if (str) {
-						addOp(ROperation::newMsgBox(errorCodeLine, str));
-					} else {
-						errorString = "Error adding string to pool";
-						return false;
-					}
-				} else {
-					errorString = "Error adding string to pool";
-					return false;
-				}
-				if (!match(TokenType::String)) return false;
-				if (!match(TokenType::LineDelim)) return false;
+			if (this.token.type === TokenType.Comma){
+				if (!this.match(TokenType.Comma)) return false;
+				notDone=true;
 			}
-			break;
-
-		case TokenType::This:
-			if (!match(TokenType::This)) return false;
-			if (!match(TokenType::Assignment)) return false;
-			if (!doExpression()) return false;
-			addOp(ROperation::newSetThis(errorCodeLine));
-			if (!match(TokenType::LineDelim)) return false;
-			break;
-
-		case TokenType::Ident:
-			if (!doAssignment()) return false;
-			break;
-
-		case TokenType::LineDelim:
-			if (!match(TokenType::LineDelim)) return false;
-			break;
-
-		case TokenType::RightCurly:
-			if (ifWantsRightCurly) return true;
-			errorString = "Unexpected symbol found '}'";
-			return false;
-
-		default:
-			errorString = "Unexpected token in block";
-			return false;
 		}
+		return this.match(TokenType.LineDelim);
 	}
-	if (ifWantsRightCurly) {
-		errorString = "Expected '}' but found "+ (token != nullptr ? tokenTypeToString(token->type) : "nulltoken");
-		return false;
-	}
-	return true;
-}
 
-void Interpreter::addOp(ROperation * rop) {
-	compiledProgram.push_back(rop);
-}
-
-void Interpreter::clearOps() {
-	for (size_t i = 0; i < compiledProgram.size(); i++) {
-		if (compiledProgram[i]) {
-			delete compiledProgram[i];
-			compiledProgram[i] = nullptr;
-		}
-	}
-	compiledProgram.clear();
-}
-
-void Interpreter::clearStringPool() {
-	for (auto & str : stringPool) {
-		delete str;
-		str = nullptr;
-	}
-	stringPool.clear();
-}
-
-string* Interpreter::newPoolString(string str) {
-	string* newstr = new string(str);
-	stringPool.push_back(newstr);
-	return newstr;
-}
-
-bool Interpreter::compile(ChartProject* chartProject, CChartObject* thisChartObject) {
-	updateChartFunctions(chartProject);
-	updateVariables(chartProject, thisChartObject);
-
-	clearStringPool();
-	clearOps();
-
-	branchCounter = 0;
-
-	errorWasDuring = InterpreterError::CODE;
-	errorCodeLine = 1;
-	errorString = "";
-	look = code.begin();
-	codeEnd = code.end();
-
-	if (next()) {
-		if (!doBlock(nullopt, false)) return false;
+	doAssignmentWithName(varName){
+		varObject = getVariable(varName);
+		if (!varObject) return this.setError(varName+" variable doesnt exist!");
+		if (!this.match(TokenType.Assignment)) return false;
+		if (!this.doExpression()) return false;
+		this.program.newMov(varObject, this.eax);
 		return true;
 	}
-	return false;
-}
 
-Variable* Interpreter::getVariable(string name) {
-	stringToLower(name);
-	if (variables.size() > 0) {
-		for (size_t i = 0; i < variables.size(); i++) {
-			if (variables[i]) {
-				if (variables[i]->name == name) {
-					return variables[i];
-				}
+	doAssignment(){
+		if (this.token.value==="") return this.setError("Empty identifier");
+		if (!this.match(TokenType.Ident)) return false;
+		if (!this.doAssignmentWithName(this.token.value)) return false;
+		return this.match(TokenType.LineDelim);
+	}
+
+	doBlock(breakToBranch, ifWantsRightCurly){
+		while (this.token.type){
+			switch (this.token.type){
+			case TokenType.If:
+				if (!this.doIf(breakToBranch)) return false;
+				break;
+			case TokenType.While:
+				if (!this.doWhile(breakToBranch)) return false;
+				break;
+			case TokenType.Break:
+				if (!this.doBreak(breakToBranch)) return false;
+				break;
+			case TokenType.Return:
+				if (!this.doReturn()) return false;
+				break;
+			case TokenType.Double:
+				if (!this.doDouble()) return false;
+				break;
+			case TokenType.MsgBox:
+				if (!this.match(TokenType.MsgBox)) return false;
+				msgString = this.token.value;
+				if (!this.match(TokenType.String)) return false;
+				this.program.newMsgBox(msgString);
+				if (!this.match(TokenType.LineDelim)) return false;
+				break;
+			case TokenType.This:
+				if (!this.match(TokenType.This)) return false;
+				if (!this.match(TokenType.Assignment)) return false;
+				if (!this.doExpression()) return false;
+				this.program.newMov(this.returnedValue, this.eax);
+				if (!this.match(TokenType.LineDelim)) return false;
+				break;
+			case TokenType.Ident:
+				if (!this.doAssignment()) return false;
+				break;
+			case TokenType.LineDelim:
+				if (!this.match(TokenType.LineDelim)) return false;
+				break;
+			case TokenType.RightCurly:
+				if (ifWantsRightCurly) return true;
+				return this.setError("Unexpected token in block, "+this.token.type);
+			default:
+				return this.setError("Unexpected token in block, "+this.token.type);
 			}
 		}
-	}
-	return nullptr;
-}
-
-bool Interpreter::addVariable(string name, bool isConstant, optional<double> value) {
-	stringToLower(name);
-	if (!getVariable(name)) {
-		variables.push_back(new Variable(name, isConstant, value));
+		if (ifWantsRightCurly) return this.setError("Expected '}' but found "+this.token.type);
 		return true;
 	}
-	errorString = "Duplicate variable name";
-	return false;
-}
 
-void Interpreter::updateVariables(ChartProject* chartProject, CChartObject* thisChartObject) {
-	clearVariables();
+	compile(chartObjectArray){
+		this.program.clear();
+		this.errorCodeLine=1;
+		this.variables=[];
+		this.branchCounter=1;
+		this.errorWasDuring=ERROR_WAS_IN.COMPILE;
+		this.code=this.code;//reset the look, lookindex and all that
+		this.chartObjectArray=Array.isArray(chartObjectArray) ? chartObjectArray : [];
 
-	if (chartProject) {
-		for (size_t i = 0; i < chartProject->constants.size(); i++) {
-			addVariable(chartProject->constants[i]->getName(), true, chartProject->constants[i]->result);
+		if (this.next()){
+			if (!this.doBlock(null, false)) return false;
+			return true;
 		}
-		if (thisChartObject && thisChartObject->type != ChartObjectType::Input) {
-			for (size_t i = 0; i < chartProject->inputs.size(); i++) {
-				addVariable(chartProject->inputs[i]->getName(), true, chartProject->inputs[i]->result);
-			}
-			for (size_t i = 0; i < chartProject->objects.size(); i++) {
-				if (chartProject->objects[i] == thisChartObject) {
-					break;
-				}
-				addVariable(chartProject->objects[i]->getName(), true, chartProject->objects[i]->result);
+		return false;
+	}
+
+	getVariable(varName){
+		varName=varName.toLowerCase();
+		for (let curVar of this.variables){
+			if (curVar.name===varName){
+				return curVar;
 			}
 		}
+		return null;
+	}
+
+	addVariable(varName, initialValue=null){
+		varName=varName.toLowerCase();
+		if (!this.getVariable(varName)){
+			this.variables.push({name: varName, value: initialValue});
+			return true;
+		}
+		return this.setError("Duplicate variable name");
+	}
+
+	getChartObject(chartName){
+		chartName=chartName.toLowerCase();
+
 	}
 }
 
-void Interpreter::clearVariables() {
-	for (size_t i = 0; i < variables.size(); i++) {
-		if (variables[i]) {
-			delete variables[i];
-			variables[i] = nullptr;
-		}
-	}
-	variables.clear();
-}
 
 ChartFunction* Interpreter::getChartFunction(string name){
 	stringToLower(name);
