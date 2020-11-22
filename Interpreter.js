@@ -15,6 +15,16 @@ const ERROR_WAS_IN = {
     EXECUTION: "execution"
 }
 
+function isAboutEquals(a, b, allowableDelta=0.00001){
+    if (isAnyNil(a,b)) return false;
+
+    if (Math.abs(a-b)<=allowableDelta){
+        return true;
+    }
+    return false;
+}
+
+
 
 class Executable{
 	static negID=1;
@@ -62,10 +72,9 @@ class Executable{
 	constructor(){
 		this._opCodes=[];
 		this.currentCodeLine=1;
-		this._hasError=false;
+		this._hadLinkError=false;
 		this._isLinked=false;
-		this._eip=0;
-		this.stack=[];
+		this._errorString="";
 	}
 
 	newNeg(objToNeg){ this._opCodes.push(Executable.newOp(Executable.negID, this.currentCodeLine, objToNeg)); }
@@ -98,14 +107,14 @@ class Executable{
 	newJNE(jumpToThisBranchId) {this._opCodes.push(Executable.newOp(Executable.jneID, this.currentCodeLine, jumpToThisBranchId));}
 	newTest(testObj) {this._opCodes.push(Executable.newOp(Executable.testID, this.currentCodeLine, testObj));}
 	newJmp(jumpToThisBranchId) {this._opCodes.push(Executable.newOp(Executable.testID, this.currentCodeLine, jumpToThisBranchId));}
-	newRet() {this._opCodes.push(Executable.newOp(Executable.retID, this.currentCodeLine));}
+	newRet(retObj) {this._opCodes.push(Executable.newOp(Executable.retID, this.currentCodeLine, retObj));}
 	newMsgBox(stringToShow) {this._opCodes.push(Executable.newOp(Executable.msgboxID, this.currentCodeLine, stringToShow));}
 
 
 	clear(){
 		this._opCodes=[];
 		this.currentCodeLine=1;
-		this._hasError=false;
+		this._hadLinkError=false;
 		this._isLinked=false;
 		this._errorString="";
 	}
@@ -130,21 +139,18 @@ class Executable{
 	}
 
 	link(){
-		this._hasError=false;
-		this._isLinked=false;
+		if (this._hadLinkError) return false;
 
 		for (let i=0;i<this._opCodes.length;i++){
 			switch (this._opCodes[i].type){
 			case Executable.jmpID:
 			case Executable.jaID:
-			case Executable.jaeID:
 			case Executable.jbID:
-			case Executable.jbeID:
 			case Executable.jeID:
 			case Executable.jneID:
 				this._opCodes[i].obj0.value = this.getLabelIndex(this._opCodes[i].obj0.value);
 				if (this._opCodes[i].obj0.value===null){
-					this._hasError=true;
+					this._hadLinkError=true;
 					return false;	
 				} 
 				break;
@@ -159,15 +165,195 @@ class Executable{
 		this.errorString="Runtime error: "+errorMsg;
 		return false;
 	}
-	execute(returnObject, timeOutMillis){
-		this._eip=0;
-		this.stack=[];
+
+	isGoodNumVal(val){
+		if (val===undefined || val===null || val===NaN) return false;
+		return true;
+	}
+
+	execute(returnObject, messageBoxFunction, timeOutMillis){
+		let stack=[];
+		let flagA=false;
+		let flagB=false;
+		let flagE=false;
+
 		if (!this._isLinked) this.link();
-		if (this._hasError || !this._isLinked) return hadError(returnObject, "link failed");
+		if (this._hadLinkError) return this.hadError(returnObject, "Link failed");
 
-		while (this._eip){
+		let time=new Date();
+		let maxRunTime=time.getTime()+timeOutMillis;
 
+		for (let eip=0; eip<this._opCodes.length; eip++){
+			if (time.getTime() > maxRunTime) return this.hadError(returnObject, "Script execution took to long, timed out");
+
+			let curOp = this._opCodes[eip];
+			switch (curOp.type){
+			case Executable.negID:
+				if (!this.isGoodNumVal(curOp.obj0.value)) return this.hadError(returnObject, "Cannot negate nil value");
+				curOp.obj0.value=0-curOp.obj0.value;
+				break;
+			case Executable.lblID:
+				//Perform no action, essentially a nop
+				continue;
+			case Executable.pushID:
+				stack.push(curOp.obj0.value);
+				break;
+			case Executable.popID:
+				if (stack.length===0) return this.hadError(returnObject, "Attempted pop on empty stack");
+				curOp.obj0.value=stack.pop();
+				break;
+			case Executable.cmpID:				
+				if (!this.isGoodNumVal(curOp.obj0.value) || !this.isGoodNumVal(curOp.obj1.value)) return this.hadError(returnObject, "Cannot operate on nil values");
+				flagA=false;
+				flagB=false;
+				flagE=false;
+				if (curOp.obj0.value > curOp.obj1.value) flagA=true;
+				if (curOp.obj0.value < curOp.obj1.value) flagB=true;
+				if (isAboutEquals(curOp.obj0.value, curOp.obj1.value)) flagE=true;
+				break;
+			case Executable.jaID:
+				if (flagA && !flagE) eip=curOp.obj0.value;
+				break;
+			case Executable.jbID:
+				if (flagB && !flagE) eip=curOp.obj0.value;
+				break;
+			case Executable.movID:
+				curOp.obj0.value = curOp.obj1.value;
+				break;
+			case Executable.trendID:
+				if (!this.isGoodNumVal(curOp.obj2.value) || 
+					!this.isGoodNumVal(curOp.obj3.value) ||
+					!this.isGoodNumVal(curOp.obj4.value)) return this.hadError(returnObject, "Cannot figureTrend with nil value(s)");
+				curOp.obj1.value = curOp.obj0.figureTrend(curOp.obj2.value, curOp.obj3.value, curOp.obj4.value);
+				break;
+			case Executable.linearID:
+				if (!this.isGoodNumVal(curOp.obj2.value) || 
+					!this.isGoodNumVal(curOp.obj3.value)) return this.hadError(returnObject, "Cannot figureChart with nil value(s)");
+				curOp.obj1.value = curOp.obj0.figureChart(curOp.obj2.value, curOp.obj3.value);
+				break;
+			case Executable.polyID:
+				if (!this.isGoodNumVal(curOp.obj2.value) || 
+					!this.isGoodNumVal(curOp.obj3.value)) return this.hadError(returnObject, "Cannot figurePoly with nil value(s)");
+				curOp.obj1.value = curOp.obj0.figurePoly(curOp.obj2.value, curOp.obj3.value);
+				break;
+			case Executable.clampID:
+				if (!this.isGoodNumVal(curOp.obj2.value) || 
+					!this.isGoodNumVal(curOp.obj3.value)) return this.hadError(returnObject, "Cannot figureClamp with nil value(s)");
+				curOp.obj1.value = curOp.obj0.figureClamp(curOp.obj2.value, curOp.obj3.value);
+				break;
+			case Executable.notID:
+				if (Math.abs(curOp.obj0.value)>=0.5){
+					curOp.obj0.value=0;
+				}else{
+					curOp.obj0.value=1;
+				}
+				break;
+			case Executable.exponentID:
+				if (!this.isGoodNumVal(curOp.obj0.value) || !this.isGoodNumVal(curOp.obj1.value)) return this.hadError(returnObject, "Cannot operate on nil values");
+				curOp.obj0.value = curOp.obj0.value ** curOp.obj1.value;
+				break;
+			case Executable.mulID:
+				if (!this.isGoodNumVal(curOp.obj0.value) || !this.isGoodNumVal(curOp.obj1.value)) return this.hadError(returnObject, "Cannot operate on nil values");
+				curOp.obj0.value = curOp.obj0.value * curOp.obj1.value;
+				break;
+			case Executable.divID:
+				if (!this.isGoodNumVal(curOp.obj0.value) || !this.isGoodNumVal(curOp.obj1.value)) return this.hadError(returnObject, "Cannot operate on nil values");
+				curOp.obj0.value = curOp.obj0.value / curOp.obj1.value;
+				break;
+			case Executable.addID:
+				if (!this.isGoodNumVal(curOp.obj0.value) || !this.isGoodNumVal(curOp.obj1.value)) return this.hadError(returnObject, "Cannot operate on nil values");
+				curOp.obj0.value = curOp.obj0.value + curOp.obj1.value;
+				break;
+			case Executable.subID:
+				if (!this.isGoodNumVal(curOp.obj0.value) || !this.isGoodNumVal(curOp.obj1.value)) return this.hadError(returnObject, "Cannot operate on nil values");
+				curOp.obj0.value = curOp.obj0.value - curOp.obj1.value;
+				break;
+			case Executable.seID:
+				if (flagE){
+					curOp.obj0.value=1;
+				}else{
+					curOp.obj0.value=0;
+				}
+				break;
+			case Executable.sneID:
+				if (flagE){
+					curOp.obj0.value=0;
+				}else{
+					curOp.obj0.value=1;
+				}
+				break;
+			case Executable.saID:
+				if (flagA){
+					curOp.obj0.value=1;
+				}else{
+					curOp.obj0.value=0;
+				}
+				break;
+			case Executable.saeID:
+				if (flagA || flagE){
+					curOp.obj0.value=1;
+				}else{
+					curOp.obj0.value=0;
+				}
+				break;
+			case Executable.sbID:
+				if (flagB){
+					curOp.obj0.value=1;
+				}else{
+					curOp.obj0.value=0;
+				}
+				break;
+			case Executable.sbeID:
+				if (flagB || flagE){
+					curOp.obj0.value=1;
+				}else{
+					curOp.obj0.value=0;
+				}
+				break;
+			case Executable.andID:
+				if (!this.isGoodNumVal(curOp.obj0.value) || !this.isGoodNumVal(curOp.obj1.value)) return this.hadError(returnObject, "Cannot operate on nil values");
+				if (Math.abs(curOp.obj0.value)>=0.5 && Math.abs(curOp.obj1.value)>=0.5){
+					curOp.obj0.value=1;
+				}else{
+					curOp.obj0.value=0;
+				}
+				break;
+			case Executable.orID:
+				if (!this.isGoodNumVal(curOp.obj0.value) || !this.isGoodNumVal(curOp.obj1.value)) return this.hadError(returnObject, "Cannot operate on nil values");
+				if (Math.abs(curOp.obj0.value)>=0.5 || Math.abs(curOp.obj1.value)>=0.5){
+					curOp.obj0.value=1;
+				}else{
+					curOp.obj0.value=0;
+				}
+				break;
+			case Executable.jeID:
+				if (flagE) eip=curOp.obj0.value;
+				break;
+			case Executable.jneID:
+				if (!flagE) eip=curOp.obj0.value;
+				break;
+			case Executable.testID:
+				if (Math.abs(curOp.obj0.value)<0.5){
+					flagE=true;
+				}else{
+					flagE=false;
+				}
+				break;
+			case Executable.jmpID:
+				eip=curOp.obj0.value;
+				break;
+			case Executable.retID:
+				returnObject.value=curOp.obj0.value;
+				return true;
+			case Executable.msgboxID:
+				//log how much time it takes for the messageBoxFunction to do so we can add it to the timeout end time
+				let msgStartTime=time.getTime();
+				messageBoxFunction(curOp.obj0.value);
+				maxRunTime+=time.getTime()-msgStartTime;
+				break;
+			}
 		}
+
 		return true;
 	}
 }
@@ -198,14 +384,28 @@ class Interpreter {
 		this.chartObjectArray=[];
 		this.owningChartObject=owningChartObject;
 
+		this._isCompiled=false;
+
 		this.program = new Executable();
     }
 
     set code(value){
+		this.program.clear();
+        this.errorString="";
+        this.errorCodeLine=1;
+        this.errorWasDuring=ERROR_WAS_IN.COMPILE;
+		this.variables=[];
+		this.token={type: null, value: null};
         this._code=value;
         this.lookIndex=0;
         this.look=code[0];
-        this.codeEndIndex=code.length;
+		this.codeEndIndex=code.length;
+		this.errorString="";
+		this.errorCodeLine=1;
+		this.errorWasDuring=ERROR_WAS_IN.COMPILE;
+		this.variables=[];
+		this.branchCounter=0;
+		this._isCompiled=false;
     }
     get code(){ return this._code; }
     
@@ -213,7 +413,10 @@ class Interpreter {
     getErrorMessage(){ return this.errorString; }
     getErrorLine(){ return this.errorLine;}
 
-	setError(msg){this.errorString=msg; return false}
+	setError(msg){
+		this.errorString=msg;
+		return false
+	}
 
     setToken(type, value=null){
         this.token.type=token;
@@ -912,7 +1115,7 @@ class Interpreter {
 	doReturn(){
 		if (!this.match(TokenType.Return)) return false;
 		if (!this.doExpression()) return false;
-		this.program.newRet();
+		this.program.newRet(this.eax);
 		return this.match(TokenType.LineDelim);
 	}
 
@@ -1001,22 +1204,6 @@ class Interpreter {
 		return true;
 	}
 
-	compile(chartObjectArray){
-		this.program.clear();
-		this.errorCodeLine=1;
-		this.variables=[];
-		this.branchCounter=1;
-		this.errorWasDuring=ERROR_WAS_IN.COMPILE;
-		this.code=this.code;//reset the look, lookindex and all that
-		this.chartObjectArray=Array.isArray(chartObjectArray) ? chartObjectArray : [];
-
-		if (this.next()){
-			if (!this.doBlock(null, false)) return false;
-			return true;
-		}
-		return false;
-	}
-
 	getVariable(varName){
 		varName=varName.toLowerCase();
 		for (let curVar of this.variables){
@@ -1057,326 +1244,30 @@ class Interpreter {
 		}
 		return retObj;
 	}
-}
 
-
-
-bool Interpreter::execute(ChartProject* chartProject, optional<double>& returnedValue) {
-	errorWasDuring = InterpreterError::EXECUTION;
-
-	if (compiledProgram.empty()) {
-		errorString = "Empty program, it must have at least a return.";
+	compile(chartObjectArray){
+		this.code=this.code;//reset the look, lookindex and all that
+		this.chartObjectArray=Array.isArray(chartObjectArray) ? chartObjectArray : [];
+		if (this.next()){
+			if (!this.doBlock(null, false)) return false;
+			this.errorWasDuring=ERROR_WAS_IN.LINKING;
+			if (!this.program.link()) return this.setError("Linking failed");
+			this._isCompiled=true;
+			return true;
+		}
 		return false;
 	}
 
-	//reset 'machine' state
-	flag_AGreater = false;
-	flag_BGreater = false;
-	flag_Equals = false;
-	eax = nullopt;
-	ebx = nullopt;
-	ecx = nullopt;
-	while (runStack.size() > 0) runStack.pop();
-
-	instructionPointer = compiledProgram.begin();
-	vector<ROperation*>::iterator endOfProgram = compiledProgram.end();
-
-	while (instructionPointer != endOfProgram) {
-		errorCodeLine = (*instructionPointer)->codeLine;
-		switch ((*instructionPointer)->type) {
-		case ROp::jmp:
-			instructionPointer = (*instructionPointer)->toLabel;
-			break;
-		case ROp::je:
-			if (flag_Equals) instructionPointer = (*instructionPointer)->toLabel;
-			break;
-		case ROp::jne:
-			if (!flag_Equals) instructionPointer = (*instructionPointer)->toLabel;
-			break;
-		case ROp::ja:
-			if (!flag_Equals && flag_AGreater) instructionPointer = (*instructionPointer)->toLabel;
-			break;
-		case ROp::jae:
-			if (flag_Equals || flag_AGreater) instructionPointer = (*instructionPointer)->toLabel;
-			break;
-		case ROp::jb:
-			if (!flag_Equals && flag_BGreater) instructionPointer = (*instructionPointer)->toLabel;
-			break;
-		case ROp::jbe:
-			if (flag_Equals || flag_BGreater) instructionPointer = (*instructionPointer)->toLabel;
-			break;
-		case ROp::push:
-			runStack.push(*((*instructionPointer)->double1));
-			break;
-		case ROp::pop:
-			*((*instructionPointer)->double1) = runStack.top();
-			runStack.pop();
-			break;
-		case ROp::mov:
-			*((*instructionPointer)->double1) = *((*instructionPointer)->double2);
-			break;
-		case ROp::load:
-			*((*instructionPointer)->double1) = (*instructionPointer)->constant;
-			break;
-		case ROp::add:
-			if ((!*(*instructionPointer)->double1) || !*(*instructionPointer)->double2){
-				errorString = "Trying to access double from nil optional";
-				return false;
+	execute(initialThisValue){
+		this.returnedValue={value: initialThisValue};
+		if (!this._isCompiled){
+			if (!this.compile()){
+				return null;
 			}
-			*((*instructionPointer)->double1) = ((*instructionPointer)->double1)->value() + ((*instructionPointer)->double2)->value();
-			break;
-		case ROp::sub:
-			if ((!*(*instructionPointer)->double1) || !*(*instructionPointer)->double2) {
-				errorString = "Trying to access double from nil optional";
-				return false;
-			}
-			*((*instructionPointer)->double1) = ((*instructionPointer)->double1)->value() - ((*instructionPointer)->double2)->value();
-			break;
-		case ROp::div:
-			if ((!*(*instructionPointer)->double1) || !*(*instructionPointer)->double2) {
-				errorString = "Trying to access double from nil optional";
-				return false;
-			}
-			if (compare_float(0, ((*instructionPointer)->double2)->value())) {
-				errorString = "Divide by zero";
-				return false;
-			}
-			*((*instructionPointer)->double1) = ((*instructionPointer)->double1)->value() / ((*instructionPointer)->double2)->value();
-			break;
-		case ROp::mul:
-			if ((!*(*instructionPointer)->double1) || !*(*instructionPointer)->double2) {
-				errorString = "Trying to access double from nil optional";
-				return false;
-			}
-			*((*instructionPointer)->double1) = ((*instructionPointer)->double1)->value() * ((*instructionPointer)->double2)->value();
-			break;
-		case ROp::neg:
-			if ((!*(*instructionPointer)->double1)) {
-				errorString = "Trying to access double from nil optional";
-				return false;
-			}
-			*((*instructionPointer)->double1) = 0 - ((*instructionPointer)->double1)->value();
-			break;
-		case ROp::power:
-			if ((!*(*instructionPointer)->double1) || !*(*instructionPointer)->double2) {
-				errorString = "Trying to access double from nil optional";
-				return false;
-			}
-			*((*instructionPointer)->double1) = pow(((*instructionPointer)->double1)->value(), ((*instructionPointer)->double2)->value());
-			break;
-		case ROp::andop:
-			if ((!*(*instructionPointer)->double1) || !*(*instructionPointer)->double2) {
-				errorString = "Trying to access double from nil optional";
-				return false;
-			}
-			if (abs(((*instructionPointer)->double1)->value()) >= 0.5 && abs(((*instructionPointer)->double2)->value()) >= 0.5) {
-				*((*instructionPointer)->double1) = 1.0f;
-			} else {
-				*((*instructionPointer)->double1) = 0.0f;
-			}
-			break;
-		case ROp::orop:
-			if ((!*(*instructionPointer)->double1) || !*(*instructionPointer)->double2) {
-				errorString = "Trying to access double from nil optional";
-				return false;
-			}
-			if (abs(((*instructionPointer)->double1)->value()) >= 0.5 || abs(((*instructionPointer)->double2)->value()) >= 0.5) {
-				*((*instructionPointer)->double1) = 1.0f;
-			} else {
-				*((*instructionPointer)->double1) = 0.0f;
-			}
-			break;
-		case ROp::notop:
-			if ((!*(*instructionPointer)->double1)) {
-				errorString = "Trying to access double from nil optional";
-				return false;
-			}
-			if (abs(((*instructionPointer)->double1)->value()) >= 0.5) {
-				*((*instructionPointer)->double1) = 0.0f;
-			} else {
-				*((*instructionPointer)->double1) = 1.0f;
-			}
-			break;
-		case ROp::clear:
-			*((*instructionPointer)->double1) = 0.0f;
-			break;
-		case ROp::set:
-			*((*instructionPointer)->double1) = 1.0f;
-			break;
-		case ROp::cmp:
-			if ((!*(*instructionPointer)->double1) || !*(*instructionPointer)->double2) {
-				errorString = "Trying to access double from nil optional";
-				return false;
-			}
-			if (*((*instructionPointer)->double1) > *((*instructionPointer)->double2)){
-				flag_AGreater = true;
-			} else {
-				flag_AGreater = false;
-			}
-			if (*((*instructionPointer)->double1) < *((*instructionPointer)->double2)) {
-				flag_BGreater = true;
-			} else {
-				flag_BGreater = false;
-			}
-			if (compare_float(((*instructionPointer)->double1)->value(), ((*instructionPointer)->double2)->value())) {
-				flag_Equals = true;
-			} else {
-				flag_Equals = false;
-			}
-			break;
-		case ROp::cmptoconstant:
-			if ((!*(*instructionPointer)->double1) || !(*instructionPointer)->constant) {
-				errorString = "Trying to access double from nil optional";
-				return false;
-			}
-			if (*((*instructionPointer)->double1) > *((*instructionPointer)->constant)) {
-				flag_AGreater = true;
-			} else {
-				flag_AGreater = false;
-			}
-			if (*((*instructionPointer)->double1) < *((*instructionPointer)->constant)) {
-				flag_BGreater = true;
-			} else {
-				flag_BGreater = false;
-			}
-			if (compare_float(((*instructionPointer)->double1)->value(), *((*instructionPointer)->constant))) {
-				flag_Equals = true;
-			} else {
-				flag_Equals = false;
-			}
-			break;
-
-		case ROp::test:
-			if ((!*(*instructionPointer)->double1)) {
-				errorString = "Trying to access double from nil optional";
-				return false;
-			}
-			if (abs(((*instructionPointer)->double1)->value()) < 0.5f) {
-				flag_Equals = true;
-			} else {
-				flag_Equals = false;
-			}
-			break;
-		case ROp::label:
-			//essentially a NOP
-			break;
-		case ROp::se:
-			if (flag_Equals) {
-				*((*instructionPointer)->double1) = 1.0f;
-			} else {
-				*((*instructionPointer)->double1) = 0.0f;
-			}
-			break;
-		case ROp::sne:
-			if (!flag_Equals) {
-				*((*instructionPointer)->double1) = 1.0f;
-			} else {
-				*((*instructionPointer)->double1) = 0.0f;
-			}
-			break;
-		case ROp::sa:
-			if (flag_AGreater) {
-				*((*instructionPointer)->double1) = 1.0f;
-			} else {
-				*((*instructionPointer)->double1) = 0.0f;
-			}
-			break;
-		case ROp::sae:
-			if (flag_AGreater || flag_Equals) {
-				*((*instructionPointer)->double1) = 1.0f;
-			} else {
-				*((*instructionPointer)->double1) = 0.0f;
-			}
-			break;
-		case ROp::sb:
-			if (flag_BGreater) {
-				*((*instructionPointer)->double1) = 1.0f;
-			} else {
-				*((*instructionPointer)->double1) = 0.0f;
-			}
-			break;
-		case ROp::sbe:
-			if (flag_BGreater || flag_Equals) {
-				*((*instructionPointer)->double1) = 1.0f;
-			} else {
-				*((*instructionPointer)->double1) = 0.0f;
-			}
-			break;
-		case ROp::ret:
-			returnedValue = eax;
-			return true;
-		case ROp::isnil:
-			if ((!*(*instructionPointer)->double2)) {
-				*((*instructionPointer)->double1) = 1.0f;
-			} else {
-				*((*instructionPointer)->double1) = 0.0f;
-			}
-			break;
-		case ROp::callclamp:
-			{
-				CClampChart* clampChart = reinterpret_cast<CClampChart*>((*instructionPointer)->chartBase);
-				*(*instructionPointer)->double2=clampChart->figureClamp(*(*instructionPointer)->double1, *(*instructionPointer)->double2);
-			}
-			break;
-		case ROp::calllinear:
-			{
-				CLinearChart* linearChart = reinterpret_cast<CLinearChart*>((*instructionPointer)->chartBase);
-				*(*instructionPointer)->double2 = linearChart->figureChart(*(*instructionPointer)->double1, *(*instructionPointer)->double2);
-			}
-			break;
-		case ROp::callpoly:
-			{
-				CPolyChart* polyChart = reinterpret_cast<CPolyChart*>((*instructionPointer)->chartBase);
-				*(*instructionPointer)->double2 = polyChart->hitTestPoly(*(*instructionPointer)->double1, *(*instructionPointer)->double2);
-			}
-			break;
-		case ROp::calltrend:
-			{
-				CTrendChart* trendChart = reinterpret_cast<CTrendChart*>((*instructionPointer)->chartBase);
-				*(*instructionPointer)->double3 = trendChart->figureTrend(*(*instructionPointer)->double1, *(*instructionPointer)->double2, *(*instructionPointer)->double3);
-			}
-			break;
-		case ROp::setThis:
-			returnedValue = eax;
-			break;
-		case ROp::getThis:
-			eax = returnedValue;
-			break;
-		case ROp::msgbox:
-			MessageBoxA(GetActiveWindow(), ((*instructionPointer)->string1)->c_str(), "Alert", 0);
 		}
-
-		instructionPointer++;
-	}
-
-	return true;
-}
-
-bool Interpreter::checkCompile(ChartProject * chartProject, CChartObject * thisChartObject, string code, int & errorLine, string & errorMessage) {
-	this->code = code;
-	
-	if (compile(chartProject, thisChartObject)) {
-		return true;
-	}
-
-	errorLine = this->errorCodeLine;
-	errorMessage = this->errorString;
-	return false;
-}
-
-bool Interpreter::runCode(ChartProject* chartProject, CChartObject* thisChartObject, string theCode, optional<double>& returnedValue) {
-	code = theCode;
-
-	if (thisChartObject) {
-		if (thisChartObject->type != ChartObjectType::Input) {
-			returnedValue = nullopt;
+		if (!this.program.execute(this.returnedValue, console.log, 5000)){
+			return null;
 		}
+		return this.returnedValue.value;
 	}
-
-	if (compile(chartProject, thisChartObject)) {
-		if (link()) {
-			return execute(chartProject, returnedValue);
-		}
-	}
-	return false;
 }
