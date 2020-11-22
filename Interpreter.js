@@ -71,7 +71,7 @@ class Executable{
 	static newOp(type, codeLine, ...stuff){
 		let retObj={type: type, codeLine: codeLine};
 		for (let i=0;i<stuff.length;i++){
-			if (typeof stuff[i] !== "object" || Array.isArray(stuff[i])) stuff[i]={value: stuff[i]};
+			if (typeof stuff[i] !== "object" || stuff[i]===null || Array.isArray(stuff[i])) stuff[i]={value: stuff[i]};
 			retObj["obj"+i]=stuff[i];
 		}
 		return retObj;
@@ -1198,7 +1198,7 @@ class Interpreter {
 				break;
 			case TokenType.MsgBox:
 				if (!this.match(TokenType.MsgBox)) return false;
-				msgString = this.token.value;
+				let msgString = this.token.value;
 				if (!this.match(TokenType.String)) return false;
 				this.program.newMsgBox(msgString);
 				if (!this.match(TokenType.LineDelim)) return false;
@@ -1301,3 +1301,81 @@ class Interpreter {
 
 
 module.exports = Interpreter;
+
+
+//Reserved words
+//abs, break, clamp, double, else, if, isnil, max, min, nil, msgbox, return, this, while
+
+//There is only one data type, double. Boolean expression are simulated with
+//any value >-0.5 and <+0.5 evaluating to false, otherwise true. Using the keywords
+//true and false can be misleading as a variable holding the value 1.1 will not be
+//equal to true due to true exactly being 1, and false being 0.
+
+//Variables can also be set to nil. Any locally created variable is initially set to nil unless explicitly set.
+//To test for nil use isNil( <ident> ).
+
+//The key word 'this' acts as a variable and once the script is done running the return value will be 'this'.
+//Alternatively you can use return <expression> to return a value.
+
+//All statements will be terminated with a ;
+
+//When using the script in an ChartInput object, 'this' is set to what the user inputted, allowing checking and enforcment of values
+//e.g.  this=clamp(this, 0, 100)
+//That script in an input object would force an input object to be between 0 and 100.
+
+//Operators and there precedence in lowest to highest are
+// ||, &&, + -, * /, ^, ! - ( )
+
+//Built in functions
+//   abs( <expression> ) returns the absolute value of the evaluated expression
+//   clamp( valueToClamp, minValue, maxValue ) returns valueToClamp clamp to in between minValue and maxValue
+//   min( <expression>, <expression> ) returns the lowest value between the two parameters
+//   max( <expression>, <expression> ) returns the highest value between the two parameters
+//   isnil( <identifier> ) returns 1.0f if the identifier holds the value nil
+
+//Variables
+//   To allocate variables, use the double statement followed by an identifier and optionally an '=' 
+//   followed by an expression. Variables can only be used after they've been defined.
+//   variable definitions can be chained and used like below
+//     double myVar=10, myOtherVar=1; //creates two variables and sets there values
+//     double notDone; //set to nil since not explicitly set
+
+//Accessing previous ChartObject values. You can only refer to ChartObjects earlier in the
+//   chartArrayObjects array that you pass in when the calc() is called, this prevents uncalculated
+//   values being allowed to be referenced.
+//   To access any chart simply access it like you would a variable
+//     double chartMinus10 = aLinearChartObjectName;
+
+//Running a chart with custom values is possible using @<chart name>(x, y, z)
+	//e.g. double serviceCeiling = @ServiceCeilChart( 60, 38000);
+	//TrendChart parameters are @<ident>(xOrYVal, entryPoint, exitPoint)
+	//LinearChart parameters are @<ident>(xOrYVal, zValue)
+	//ClampChart parameters are @<ident>(xOrYVal, valueToClamp)
+	//PolyChart parameters are @<ident>(x, y)
+
+
+//While loop
+//  The while loop will continue looping until its expression evaulates to false.
+//  You can use the break statment to exit the loop
+//  while ( <expression> ) {
+//      if isnil(myVariable) {
+//			break;
+//      }
+//  }
+
+//If statement
+//  The if statement will run code in the first curly block if the expression evaulates true
+//  You can also chain else ifs elses, e.g.
+//  if <expression> {
+//	   [your code here]
+//	} else if <expression> {
+//     [your code here]
+//  } else {
+//	   [your code here]
+//  }
+
+//Msgbox statement
+//  The msgbox statement is meant to be used in ChartInput scripts to alert the user of
+//  any illegal values they entered and that the value will be defaulted to something else
+//  After the msgbox keyword you provide a string in quotation marks (").
+//  example: msgbox "Your message here";

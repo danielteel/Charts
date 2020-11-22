@@ -14,7 +14,7 @@ let {
  } = require(('./ChartObjects.js'));
 
 
- let newScript = new ChartInput("test", "if isnil(this){this=0;} this=clamp(this,25,75);");
+ let newScript = new ChartInput("test", "double a,b=1,c; if isnil(a){msgbox\"a is nil\";} if isnil(b){msgbox\"b is nil\";} if isnil(c){msgbox\"c is nil\";}");
 newScript.value=Math.random()*100;
 newScript.calc();
 

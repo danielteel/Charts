@@ -223,7 +223,7 @@ class ChartObject {
         this.value=initialValue;
     }
 
-    calc(){//Meant to be overridden at child class
+    calc(chartObjectArray){//Meant to be overridden at child class
     }
 }
 
@@ -246,7 +246,7 @@ class LinearChart extends ChartObject {
         }
     }
 
-    calc(){
+    calc(chartObjectArray){
         if (isAnyNil(this.xOrYRefObj, this.zRefObj)){
             this.value=null;
         }else{
@@ -313,7 +313,7 @@ class ClampChart extends ChartObject {
         }
     }
 
-    calc(){
+    calc(chartObjectArray){
         if (isAnyNil(this.xOrYRefObj, this.valueToClampRefObj)){
             this.value=null;
         }else{
@@ -362,7 +362,7 @@ class TrendChart extends ChartObject{
         }
     }
 
-    calc(){
+    calc(chartObjectArray){
         if (isAnyNil(this.xOrYRefObj, this.entryPointRefObj, this.exitPointRefObj)){
             this.value=null;
         }else{
@@ -438,7 +438,7 @@ class PolyChart extends ChartObject{
         }
     }
 
-    calc(){
+    calc(chartObjectArray){
         if (isAnyNil(this.xInRefObj, this.yInRefObj)){
             this.value=null;
         }else{
@@ -549,7 +549,7 @@ class ChartTable extends ChartObject {
         return ((inValue - below.value) / valDiff) * resultDiff + below.refObj.value;
     }
 
-    calc(){
+    calc(chartObjectArray){
         if (isAnyNil(this.inputRefObj)){ 
             this.value=null;
         }else{
@@ -562,10 +562,10 @@ class ChartInput extends ChartObject {
     constructor(name="", script="", initialValue=null){
         super(name, "input", initialValue);
         this.interpreter = new Interpreter(this, script);
-        this.interpreter.compile();
     }
 
-    calc(){
+    calc(chartObjectArray){
+        this.interpreter.compile(chartObjectArray);
         this.value = this.interpreter.run(this.value);
     }
 }
@@ -576,7 +576,8 @@ class ChartScript extends ChartObject {
         this.interpreter = new Interpreter(this, script);
     }
 
-    calc(){
+    calc(chartObjectArray){
+        this.interpreter.compile(chartObjectArray);
         this.value = this.interpreter.run(null);
     }
 }
