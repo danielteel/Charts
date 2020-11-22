@@ -559,9 +559,10 @@ class ChartTable extends ChartObject {
 }
 
 class ChartInput extends ChartObject {
-    constructor(name="", script=""){
-        super(name, "input", null);
+    constructor(name="", script="", initialValue=null){
+        super(name, "input", initialValue);
         this.interpreter = new Interpreter(this, script);
+        this.interpreter.compile();
     }
 
     calc(){

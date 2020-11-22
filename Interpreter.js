@@ -15,6 +15,13 @@ const ERROR_WAS_IN = {
     EXECUTION: "execution"
 }
 
+function isAnyNil(...vals){
+    for (let a of vals){
+        if (a===null || a===undefined) return true;
+    }
+    return false;
+}
+
 function isAboutEquals(a, b, allowableDelta=0.00001){
     if (isAnyNil(a,b)) return false;
 
@@ -59,6 +66,7 @@ class Executable{
 	static jmpID=30;
 	static retID=31;
 	static msgboxID=32;
+	static isnilID=33;
 	
 	static newOp(type, codeLine, ...stuff){
 		let retObj={type: type, codeLine: codeLine};
@@ -106,9 +114,10 @@ class Executable{
 	newJE(jumpToThisBranchId) {this._opCodes.push(Executable.newOp(Executable.jeID, this.currentCodeLine, jumpToThisBranchId));}
 	newJNE(jumpToThisBranchId) {this._opCodes.push(Executable.newOp(Executable.jneID, this.currentCodeLine, jumpToThisBranchId));}
 	newTest(testObj) {this._opCodes.push(Executable.newOp(Executable.testID, this.currentCodeLine, testObj));}
-	newJmp(jumpToThisBranchId) {this._opCodes.push(Executable.newOp(Executable.testID, this.currentCodeLine, jumpToThisBranchId));}
+	newJmp(jumpToThisBranchId) {this._opCodes.push(Executable.newOp(Executable.jmpID, this.currentCodeLine, jumpToThisBranchId));}
 	newRet(retObj) {this._opCodes.push(Executable.newOp(Executable.retID, this.currentCodeLine, retObj));}
 	newMsgBox(stringToShow) {this._opCodes.push(Executable.newOp(Executable.msgboxID, this.currentCodeLine, stringToShow));}
+	newIsNil(recvObj, identObj) {this._opCodes.push(Executable.newOp(Executable.isnilID, this.currentCodeLine, recvObj, identObj));}
 
 
 	clear(){
@@ -162,7 +171,7 @@ class Executable{
 
 	hadError(returnObject, errorMsg){
 		returnObject.value=null;
-		this.errorString="Runtime error: "+errorMsg;
+		this._errorString="Runtime error: "+errorMsg;
 		return false;
 	}
 
@@ -180,11 +189,10 @@ class Executable{
 		if (!this._isLinked) this.link();
 		if (this._hadLinkError) return this.hadError(returnObject, "Link failed");
 
-		let time=new Date();
-		let maxRunTime=time.getTime()+timeOutMillis;
+		let maxRunTime=new Date().getTime()+timeOutMillis;
 
 		for (let eip=0; eip<this._opCodes.length; eip++){
-			if (time.getTime() > maxRunTime) return this.hadError(returnObject, "Script execution took to long, timed out");
+			if (new Date().getTime() > maxRunTime) return this.hadError(returnObject, "Script execution took to long, timed out");
 
 			let curOp = this._opCodes[eip];
 			switch (curOp.type){
@@ -347,10 +355,16 @@ class Executable{
 				return true;
 			case Executable.msgboxID:
 				//log how much time it takes for the messageBoxFunction to do so we can add it to the timeout end time
-				let msgStartTime=time.getTime();
+				let msgStartTime=new Date().getTime();
 				messageBoxFunction(curOp.obj0.value);
-				maxRunTime+=time.getTime()-msgStartTime;
+				maxRunTime+=new Date().getTime()-msgStartTime;
 				break;
+			case Executable.isnilID:
+				if (curOp.obj1.value===null || curOp.obj1.value===undefined || curOp.obj1.value===NaN){
+					curOp.obj0.value=1;
+				}else{
+					curOp.obj0.value=0;
+				}
 			}
 		}
 
@@ -709,7 +723,7 @@ class Interpreter {
 	}
 
 	newBranch(){
-		return ++this.branchCounter();
+		return ++this.branchCounter;
 	}
 
 	isPowerOp(){
@@ -827,12 +841,18 @@ class Interpreter {
 		if (!this.match(TokenType.FuncBoolIsNil)) return false;
 		if (!this.match(TokenType.LeftParen)) return false;
 
-		let identObj = this.getIdentObject(this.token.value);
-		if (!identObj) return this.setError(this.token.value+" doesnt exist!");
+		let identObj=null;
+		if (this.token.type!==TokenType.This){
+			identObj = this.getIdentObject(this.token.value);
+			if (!identObj) return this.setError(this.token.value+" doesnt exist!");
+			if (!this.match(TokenType.Ident)) return false;
+		}else{
+			identObj=this.returnedValue;
+			if (!this.match(TokenType.This)) return false;
+		}
 
-		this.program.newIsNil(identObj);
+		this.program.newIsNil(this.eax, identObj);
 
-		if (!this.match(TokenType.Ident)) return false;
 		if (!this.match(TokenType.RightParen)) return false;
 
 		return true;
@@ -947,7 +967,7 @@ class Interpreter {
 				if (!this.doFactor()) return false;
 				this.program.newMov(this.ebx, this.eax);
 				this.program.newPop(this.eax);
-				this.program.newPower(this.eax, this.ebx);
+				this.program.newExponent(this.eax, this.ebx);
 				break;
 			}
 		}
@@ -1127,8 +1147,8 @@ class Interpreter {
 		let notDone=true;
 		while (notDone){
 			notDone=false;
-			varName = this.token.value;
-			if (!addVariable(varName, false, null)) return false;
+			let varName = this.token.value;
+			if (!this.addVariable(varName, false, null)) return false;
 			if (!this.match(TokenType.Ident)) return false;
 			if (this.token.type === TokenType.Assignment){
 				if (!this.doAssignmentWithName(varName)) return false;
@@ -1142,7 +1162,7 @@ class Interpreter {
 	}
 
 	doAssignmentWithName(varName){
-		varObject = getVariable(varName);
+		let varObject = this.getVariable(varName);
 		if (!varObject) return this.setError(varName+" variable doesnt exist!");
 		if (!this.match(TokenType.Assignment)) return false;
 		if (!this.doExpression()) return false;
@@ -1152,8 +1172,9 @@ class Interpreter {
 
 	doAssignment(){
 		if (this.token.value==="") return this.setError("Empty identifier");
+		let varName=this.token.value;
 		if (!this.match(TokenType.Ident)) return false;
-		if (!this.doAssignmentWithName(this.token.value)) return false;
+		if (!this.doAssignmentWithName(varName)) return false;
 		return this.match(TokenType.LineDelim);
 	}
 
@@ -1261,7 +1282,7 @@ class Interpreter {
 	}
 
 	run(initialThisValue){
-		this.returnedValue={value: initialThisValue};
+		this.returnedValue.value=initialThisValue;
 		if (!this._isCompiled){
 			if (!this.compile()){
 				return null;
@@ -1271,6 +1292,7 @@ class Interpreter {
 			curVar.value=null;
 		}
 		if (!this.program.execute(this.returnedValue, console.log, 5000)){
+			this.setError(this.program.errorString);
 			return null;
 		}
 		return this.returnedValue.value;
