@@ -22,8 +22,6 @@ class Executable{
 	static pushID=3;
 	static popID=4;
 	static cmpID=5;
-	static jeID=27;
-	static jneID=28;
 	static jaID=6;
 	static jbID=7;
 	static movID=8;
@@ -45,6 +43,10 @@ class Executable{
 	static sbeID=24;
 	static andID=25;
 	static orID=26;
+	static jeID=27;
+	static jneID=28;
+	static testID=29;
+	static jmpID=30;
 	
 	static newOp(type, codeLine, ...stuff){
 		let retObj={type: type, codeLine: codeLine};
@@ -96,7 +98,8 @@ class Executable{
 	newOr(recvObj, otherObj) {this._opCodes.push(Executable.newOp(Executable.orID, this.currentCodeLine, recvObj, otherObj));}
 	newJE(jumpToThisBranchId) {this._opCodes.push(Executable.newOp(Executable.jeID, this.currentCodeLine, jumpToThisBranchId));}
 	newJNE(jumpToThisBranchId) {this._opCodes.push(Executable.newOp(Executable.jneID, this.currentCodeLine, jumpToThisBranchId));}
-
+	newTest(testObj) {this._opCodes.push(Executable.newOp(Executable.testID, this.currentCodeLine, testObj));}
+	newJmp(jumpToThisBranchId) {this._opCodes.push(Executable.newOp(Executable.testID, this.currentCodeLine, jumpToThisBranchId));}
 }
 
 class Interpreter {
@@ -748,94 +751,82 @@ class Interpreter {
 		}
 		return true;
 	}
-}
 
-
-
-bool Interpreter::doAnd() {
-	if (!doCompare()) return false;
-	while (isAndOp()) {
-		addOp(ROperation::newPush(errorCodeLine, &eax));
-		switch (token->type) {
-		case TokenType::And:
-			if (!match(TokenType::And)) return false;
-			if (!doCompare()) return false;
-			addOp(ROperation::newPop(errorCodeLine, &ebx));
-			addOp(ROperation::newAnd(errorCodeLine, &eax, &ebx));
-			break;
+	doAnd(){
+		if (!this.doCompare()) return false;
+		while (this.isAndOp()){
+			this.program.newPush(this.eax);
+			if (this.token.type===TokenType.And){
+				if (!this.match(TokenType.And)) return false;
+				if (!this.doCompare()) return false;
+				this.program.newPop(this.ebx);
+				this.program.newAnd(this.eax, this.ebx);
+			}
 		}
+		return true;
 	}
-	return true;
-}
 
-bool Interpreter::doExpression() {
-	if (!doAnd()) return false;
-	while (isOrOp()) {
-		addOp(ROperation::newPush(errorCodeLine, &eax));
-		switch (token->type) {
-		case TokenType::Or:
-			if (!match(TokenType::Or)) return false;
-			if (!doAnd()) return false;
-			addOp(ROperation::newPop(errorCodeLine, &ebx));
-			addOp(ROperation::newOr(errorCodeLine, &eax, &ebx));
-			break;
+	doExpression(){
+		if (!this.doAnd()) return false;
+		while (this.isOrOp()){
+			this.program.newPush(this.eax);
+			if (this.token.type===TokenType.Or){
+				if (!this.match(TokenType.Or)) return false;
+				if (!this.doAnd()) return false;
+				this.program.newPop(this.ebx);
+				this.program.newOr(this.eax, this.ebx);
+			}
 		}
+		return true;
 	}
-	return true;
-}
 
+	doIf(breakToBranch){
+		let elseLabel = this.newBranch();
+		let endLabel = this.newBranch();
+		if (!this.match(TokenType.If)) return false;
+		if (!this.doExpression()) return false;
 
-bool Interpreter::doIf(optional<BranchID> breakToBranch) {
-	BranchID elseLabel = newBranch();
-	BranchID endLabel = newBranch();
+		this.program.newTest(this.eax);
+		this.program.newJE(elseLabel);
 
-	if (!match(TokenType::If)) return false;
-	if (!doExpression()) return false;
-	
-	addOp(ROperation::newTest(errorCodeLine, &eax));
-	addOp(ROperation::newJE(errorCodeLine, elseLabel));
+		if (!this.match(TokenType.LeftCurly)) return false;
+		if (!this.doBlock(breakToBranch, true)) return false;
+		if (!this.match(TokenType.RightCurly)) return false;
 
-	if (!match(TokenType::LeftCurly)) return false;
-	if (!doBlock(breakToBranch, true)) return false;
-	if (!match(TokenType::RightCurly)) return false;
+		this.program.newJmp(endLabel);
+		this.program.newLabel(elseLabel);
 
-	addOp(ROperation::newJmp(errorCodeLine, endLabel));
-	addOp(ROperation::newLabel(errorCodeLine, elseLabel));
-
-	if (token && token->type == TokenType::Else) {
-		if (!match(TokenType::Else)) return false;
-		if (token && token->type == TokenType::If) {
-			if (!doIf(breakToBranch)) return false;
-		} else {
-			if (!match(TokenType::LeftCurly)) return false;
-			if (!doBlock(breakToBranch, true)) return false;
-			if (!match(TokenType::RightCurly)) return false;
+		if (this.token.type === TokenType.Else) {
+			if (!this.match(TokenType.Else)) return false;
+			if (this.token.type === TokenType.If) {
+				if (!this.doIf(breakToBranch)) return false;
+			} else {
+				if (!this.match(TokenType.LeftCurly)) return false;
+				if (!this.doBlock(breakToBranch, true)) return false;
+				if (!this.match(TokenType.RightCurly)) return false;
+			}
 		}
+		this.program.newLabel(endLabel);
+		return true;
 	}
-	addOp(ROperation::newLabel(errorCodeLine, endLabel));
-	return true;
+
+	doWhile(breakToBranch){
+		let loopLabel = this.newBranch();
+		let endLabel = this.newBranch();
+		if (!this.match(TokenType.While)) return false;
+		this.program.newLabel(loopLabel);
+		if (!this.doExpression()) return false;
+		this.program.newTest(this.eax);
+		this.program.newJE(endLabel);
+		if (!this.match(TokenType.LeftCurly)) return false;
+		if (!this.doBlock(endLabel, true)) return false;
+		if (!this.match(TokenType.RightCurly)) return false;
+		this.program.newJmp(loopLabel);
+		this.program.newLabel(endLabel);
+		return true;
+	}
 }
 
-bool Interpreter::doWhile(optional<BranchID> breakToBranch) {
-	BranchID loopLabel = newBranch();
-	BranchID endLabel = newBranch();
-
-	if (!match(TokenType::While)) return false;
-	
-	addOp(ROperation::newLabel(errorCodeLine, loopLabel));
-	if (!doExpression()) return false;
-	addOp(ROperation::newTest(errorCodeLine, &eax));
-	addOp(ROperation::newJE(errorCodeLine, endLabel));
-
-	if (!match(TokenType::LeftCurly)) return false;
-	if (!doBlock(endLabel, true)) return false;
-	if (!match(TokenType::RightCurly)) return false;
-
-	addOp(ROperation::newJmp(errorCodeLine, loopLabel));
-	addOp(ROperation::newLabel(errorCodeLine, endLabel));
-
-	return true;
-}
 
 bool Interpreter::doBreak(optional<BranchID> breakToBranch) {
 	if (match(TokenType::Break)) {
