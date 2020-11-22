@@ -1258,12 +1258,15 @@ class Interpreter {
 		return false;
 	}
 
-	execute(initialThisValue){
+	run(initialThisValue){
 		this.returnedValue={value: initialThisValue};
 		if (!this._isCompiled){
 			if (!this.compile()){
 				return null;
 			}
+		}
+		for (let curVar of this.variables){
+			curVar.value=null;
 		}
 		if (!this.program.execute(this.returnedValue, console.log, 5000)){
 			return null;
