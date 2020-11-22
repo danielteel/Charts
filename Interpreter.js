@@ -62,15 +62,10 @@ class Executable{
 	constructor(){
 		this._opCodes=[];
 		this.currentCodeLine=1;
-	}
-	
-	clear(){
-		this._opCodes=[];
-		this.currentCodeLine=1;
-	}
-
-	getOpCodes(){
-		return [...this._opCodes];
+		this._hasError=false;
+		this._isLinked=false;
+		this._eip=0;
+		this.stack=[];
 	}
 
 	newNeg(objToNeg){ this._opCodes.push(Executable.newOp(Executable.negID, this.currentCodeLine, objToNeg)); }
@@ -105,6 +100,76 @@ class Executable{
 	newJmp(jumpToThisBranchId) {this._opCodes.push(Executable.newOp(Executable.testID, this.currentCodeLine, jumpToThisBranchId));}
 	newRet() {this._opCodes.push(Executable.newOp(Executable.retID, this.currentCodeLine));}
 	newMsgBox(stringToShow) {this._opCodes.push(Executable.newOp(Executable.msgboxID, this.currentCodeLine, stringToShow));}
+
+
+	clear(){
+		this._opCodes=[];
+		this.currentCodeLine=1;
+		this._hasError=false;
+		this._isLinked=false;
+		this._errorString="";
+	}
+
+	get errorString(){
+		return this._errorString;
+	}
+
+	getOpCodes(){
+		return [...this._opCodes];
+	}
+
+	getLabelIndex(labelID){
+		for (let i=0;i<this._opCodes.length;i++){
+			if (this._opCodes[i].type===Executable.lblID){
+				if (this._opCodes[i].obj0.value===labelID){
+					return i;
+				}
+			}
+		}
+		return null;
+	}
+
+	link(){
+		this._hasError=false;
+		this._isLinked=false;
+
+		for (let i=0;i<this._opCodes.length;i++){
+			switch (this._opCodes[i].type){
+			case Executable.jmpID:
+			case Executable.jaID:
+			case Executable.jaeID:
+			case Executable.jbID:
+			case Executable.jbeID:
+			case Executable.jeID:
+			case Executable.jneID:
+				this._opCodes[i].obj0.value = this.getLabelIndex(this._opCodes[i].obj0.value);
+				if (this._opCodes[i].obj0.value===null){
+					this._hasError=true;
+					return false;	
+				} 
+				break;
+			}
+		}
+		this._isLinked=true;
+		return true;
+	}
+
+	hadError(returnObject, errorMsg){
+		returnObject.value=null;
+		this.errorString="Runtime error: "+errorMsg;
+		return false;
+	}
+	execute(returnObject, timeOutMillis){
+		this._eip=0;
+		this.stack=[];
+		if (!this._isLinked) this.link();
+		if (this._hasError || !this._isLinked) return hadError(returnObject, "link failed");
+
+		while (this._eip){
+
+		}
+		return true;
+	}
 }
 
 class Interpreter {
@@ -125,9 +190,9 @@ class Interpreter {
 		
 		this.branchCounter=0;
 
-		this.eax=0;
-		this.ebx=0;
-		this.ecx=0;
+		this.eax={value: null};
+		this.ebx={value: null};
+		this.ecx={value: null};
 		this.returnedValue={value: null};
 
 		this.chartObjectArray=[];
@@ -964,89 +1029,38 @@ class Interpreter {
 
 	addVariable(varName, initialValue=null){
 		varName=varName.toLowerCase();
-		if (!this.getVariable(varName)){
+		if (!this.getVariable(varName) && !this.getChartObject(varName, false)){
 			this.variables.push({name: varName, value: initialValue});
 			return true;
 		}
 		return this.setError("Duplicate variable name");
 	}
 
-	getChartObject(chartName){
+	getChartObject(chartName, careAboutOrder=true){
 		chartName=chartName.toLowerCase();
-
-	}
-}
-
-
-ChartFunction* Interpreter::getChartFunction(string name){
-	stringToLower(name);
-	for (auto & chartFunction : chartFunctions) {
-		if (chartFunction->name == name) {
-			return chartFunction;
-		}
-	}
-	return nullptr;
-}
-
-void Interpreter::updateChartFunctions(ChartProject * chartProject) {
-	clearChartFunctions();
-	if (chartProject) {
-		for (auto& object : chartProject->objects) {
-			if (object->toChartBase()) {
-				CChartBase* chartBase = reinterpret_cast<CChartBase*>(object);
-				if (chartBase) {
-					chartFunctions.push_back(new ChartFunction(stringToLowerCopy(chartBase->getName()), chartBase));
-				}
+		for (let i=0;i<this.chartObjectArray.length;i++){
+			if (this.chartObjectArray[i]===this.owningChartObject && careAboutOrder===true){
+				break;
+			}
+			if (this.chartObjectArray[i].name.toLowerCase()===chartName){
+				return this.chartObjectArray[i];
 			}
 		}
+		return null;
 	}
-}
 
-void Interpreter::clearChartFunctions() {
-	for (auto& chartFunction : chartFunctions) {
-		delete chartFunction;
-		chartFunction = nullptr;
-	}
-	chartFunctions.clear();
-}
-
-bool Interpreter::getLabelIterator(BranchID branch, vector<ROperation*>::iterator& returnIterator) {
-	for (size_t i = 0; i < compiledProgram.size(); i++) {
-		if (compiledProgram[i]->type == ROp::label) {
-			if (compiledProgram[i]->thisLabelID == branch) {
-				vector<ROperation*>::iterator jmpIterator = compiledProgram.begin();
-				advance(jmpIterator, i);
-				returnIterator = jmpIterator;
-				return true;
-			}
+	getIdentObject(objName){
+		objName=objName.toLowerCase();
+		let retObj=this.getVariable(objName);
+		if (!retObj){
+			retObj=this.getChartObject(objName);
 		}
+		return retObj;
 	}
-	return false;
 }
 
-bool Interpreter::link() {
-	errorWasDuring = InterpreterError::LINK;
-	for (size_t i = 0; i < compiledProgram.size(); i++) {
-		switch (compiledProgram[i]->type) {
-		case ROp::jmp:
-		case ROp::ja:
-		case ROp::jae:
-		case ROp::jb:
-		case ROp::jbe:
-		case ROp::je:
-		case ROp::jne:
-			{
-				vector<ROperation*>::iterator jmpToIterator;
-				if (!getLabelIterator(compiledProgram[i]->toLabelID, jmpToIterator)) {
-					errorString = "Unable to resolve label reference " + to_string(compiledProgram[i]->toLabelID);
-					return false;
-				}
-				compiledProgram[i]->toLabel = jmpToIterator;
-			}
-		}
-	}
-	return true;
-}
+
+
 bool Interpreter::execute(ChartProject* chartProject, optional<double>& returnedValue) {
 	errorWasDuring = InterpreterError::EXECUTION;
 
