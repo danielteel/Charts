@@ -14,9 +14,7 @@ let {
  } = require(('./ChartObjects.js'));
 
 
- let newScript = new ChartInput("test", "double a,b=1,c; if isnil(a){msgbox\"a is nil\";} if isnil(b){msgbox\"b is nil\";} if isnil(c){msgbox\"c is nil\";}");
-newScript.value=Math.random()*100;
+let newScript = new ChartInput("test", "return (5+10)/2+5*6+2^2;");
 newScript.calc();
-
 console.log(newScript.interpreter.getErrorMessage());
- console.log(newScript.value);
+console.log(newScript.value);

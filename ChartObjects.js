@@ -565,8 +565,7 @@ class ChartInput extends ChartObject {
     }
 
     calc(chartObjectArray){
-        this.interpreter.compile(chartObjectArray);
-        this.value = this.interpreter.run(this.value);
+        this.value = this.interpreter.run(chartObjectArray, this.value);
     }
 }
 
@@ -577,8 +576,7 @@ class ChartScript extends ChartObject {
     }
 
     calc(chartObjectArray){
-        this.interpreter.compile(chartObjectArray);
-        this.value = this.interpreter.run(null);
+        this.value = this.interpreter.run(chartObjectArray, null);
     }
 }
 

@@ -83,6 +83,7 @@ class Executable{
 		this._hadLinkError=false;
 		this._isLinked=false;
 		this._errorString="";
+		this._errorOnLine=0;
 	}
 
 	newNeg(objToNeg){ this._opCodes.push(Executable.newOp(Executable.negID, this.currentCodeLine, objToNeg)); }
@@ -120,20 +121,28 @@ class Executable{
 	newIsNil(recvObj, identObj) {this._opCodes.push(Executable.newOp(Executable.isnilID, this.currentCodeLine, recvObj, identObj));}
 
 
-	clear(){
+	reset(){
 		this._opCodes=[];
 		this.currentCodeLine=1;
 		this._hadLinkError=false;
 		this._isLinked=false;
 		this._errorString="";
+		this._errorOnLine=0;
 	}
 
 	get errorString(){
 		return this._errorString;
 	}
 
-	getOpCodes(){
-		return [...this._opCodes];
+	hadError(codeLine, returnObject, errorMsg){
+		returnObject.value=null;
+		this._errorString="Runtime error on line "+codeLine+": "+errorMsg;
+		return false;
+	}
+
+	isGoodNumVal(val){
+		if (val===undefined || val===null || val===NaN) return false;
+		return true;
 	}
 
 	getLabelIndex(labelID){
@@ -149,7 +158,7 @@ class Executable{
 
 	link(){
 		if (this._hadLinkError) return false;
-
+		if (this._isLinked) return true;
 		for (let i=0;i<this._opCodes.length;i++){
 			switch (this._opCodes[i].type){
 			case Executable.jmpID:
@@ -169,35 +178,24 @@ class Executable{
 		return true;
 	}
 
-	hadError(returnObject, errorMsg){
-		returnObject.value=null;
-		this._errorString="Runtime error: "+errorMsg;
-		return false;
-	}
-
-	isGoodNumVal(val){
-		if (val===undefined || val===null || val===NaN) return false;
-		return true;
-	}
-
 	execute(returnObject, messageBoxFunction, timeOutMillis){
 		let stack=[];
 		let flagA=false;
 		let flagB=false;
 		let flagE=false;
 
-		if (!this._isLinked) this.link();
-		if (this._hadLinkError) return this.hadError(returnObject, "Link failed");
+		if (!this.link()) return this.hadError(0, returnObject, "link failed");
 
 		let maxRunTime=new Date().getTime()+timeOutMillis;
 
 		for (let eip=0; eip<this._opCodes.length; eip++){
-			if (new Date().getTime() > maxRunTime) return this.hadError(returnObject, "Script execution took to long, timed out");
-
 			let curOp = this._opCodes[eip];
+			
+			if (new Date().getTime() > maxRunTime) return this.hadError(curOp.codeLine, returnObject, "script execution took to long, timed out");
+
 			switch (curOp.type){
 			case Executable.negID:
-				if (!this.isGoodNumVal(curOp.obj0.value)) return this.hadError(returnObject, "Cannot negate nil value");
+				if (!this.isGoodNumVal(curOp.obj0.value)) return this.hadError(curOp.codeLine, returnObject, "cannot negate nil value");
 				curOp.obj0.value=0-curOp.obj0.value;
 				break;
 			case Executable.lblID:
@@ -207,11 +205,12 @@ class Executable{
 				stack.push(curOp.obj0.value);
 				break;
 			case Executable.popID:
-				if (stack.length===0) return this.hadError(returnObject, "Attempted pop on empty stack");
+				if (stack.length===0) return this.hadError(returnObject, "attempted pop on empty stack");
 				curOp.obj0.value=stack.pop();
 				break;
 			case Executable.cmpID:				
-				if (!this.isGoodNumVal(curOp.obj0.value) || !this.isGoodNumVal(curOp.obj1.value)) return this.hadError(returnObject, "Cannot operate on nil values");
+				if (!this.isGoodNumVal(curOp.obj0.value) || 
+					!this.isGoodNumVal(curOp.obj1.value)) return this.hadError(curOp.codeLine, returnObject, "cannot operate on nil values");
 				flagA=false;
 				flagB=false;
 				flagE=false;
@@ -231,22 +230,22 @@ class Executable{
 			case Executable.trendID:
 				if (!this.isGoodNumVal(curOp.obj2.value) || 
 					!this.isGoodNumVal(curOp.obj3.value) ||
-					!this.isGoodNumVal(curOp.obj4.value)) return this.hadError(returnObject, "Cannot figureTrend with nil value(s)");
+					!this.isGoodNumVal(curOp.obj4.value)) return this.hadError(curOp.codeLine, returnObject, "cannot figureTrend with nil value(s)");
 				curOp.obj1.value = curOp.obj0.figureTrend(curOp.obj2.value, curOp.obj3.value, curOp.obj4.value);
 				break;
 			case Executable.linearID:
 				if (!this.isGoodNumVal(curOp.obj2.value) || 
-					!this.isGoodNumVal(curOp.obj3.value)) return this.hadError(returnObject, "Cannot figureChart with nil value(s)");
+					!this.isGoodNumVal(curOp.obj3.value)) return this.hadError(curOp.codeLine, returnObject, "cannot figureChart with nil value(s)");
 				curOp.obj1.value = curOp.obj0.figureChart(curOp.obj2.value, curOp.obj3.value);
 				break;
 			case Executable.polyID:
 				if (!this.isGoodNumVal(curOp.obj2.value) || 
-					!this.isGoodNumVal(curOp.obj3.value)) return this.hadError(returnObject, "Cannot figurePoly with nil value(s)");
+					!this.isGoodNumVal(curOp.obj3.value)) return this.hadError(curOp.codeLine, returnObject, "cannot figurePoly with nil value(s)");
 				curOp.obj1.value = curOp.obj0.figurePoly(curOp.obj2.value, curOp.obj3.value);
 				break;
 			case Executable.clampID:
 				if (!this.isGoodNumVal(curOp.obj2.value) || 
-					!this.isGoodNumVal(curOp.obj3.value)) return this.hadError(returnObject, "Cannot figureClamp with nil value(s)");
+					!this.isGoodNumVal(curOp.obj3.value)) return this.hadError(curOp.codeLine, returnObject, "cannot figureClamp with nil value(s)");
 				curOp.obj1.value = curOp.obj0.figureClamp(curOp.obj2.value, curOp.obj3.value);
 				break;
 			case Executable.notID:
@@ -257,23 +256,28 @@ class Executable{
 				}
 				break;
 			case Executable.exponentID:
-				if (!this.isGoodNumVal(curOp.obj0.value) || !this.isGoodNumVal(curOp.obj1.value)) return this.hadError(returnObject, "Cannot operate on nil values");
+				if (!this.isGoodNumVal(curOp.obj0.value) ||
+					!this.isGoodNumVal(curOp.obj1.value)) return this.hadError(curOp.codeLine, returnObject, "cannot operate on nil values");
 				curOp.obj0.value = curOp.obj0.value ** curOp.obj1.value;
 				break;
 			case Executable.mulID:
-				if (!this.isGoodNumVal(curOp.obj0.value) || !this.isGoodNumVal(curOp.obj1.value)) return this.hadError(returnObject, "Cannot operate on nil values");
+				if (!this.isGoodNumVal(curOp.obj0.value) ||
+					!this.isGoodNumVal(curOp.obj1.value)) return this.hadError(curOp.codeLine, returnObject, "cannot operate on nil values");
 				curOp.obj0.value = curOp.obj0.value * curOp.obj1.value;
 				break;
 			case Executable.divID:
-				if (!this.isGoodNumVal(curOp.obj0.value) || !this.isGoodNumVal(curOp.obj1.value)) return this.hadError(returnObject, "Cannot operate on nil values");
+				if (!this.isGoodNumVal(curOp.obj0.value) ||
+					!this.isGoodNumVal(curOp.obj1.value)) return this.hadError(curOp.codeLine, returnObject, "cannot operate on nil values");
 				curOp.obj0.value = curOp.obj0.value / curOp.obj1.value;
 				break;
 			case Executable.addID:
-				if (!this.isGoodNumVal(curOp.obj0.value) || !this.isGoodNumVal(curOp.obj1.value)) return this.hadError(returnObject, "Cannot operate on nil values");
+				if (!this.isGoodNumVal(curOp.obj0.value) ||
+					!this.isGoodNumVal(curOp.obj1.value)) return this.hadError(curOp.codeLine, returnObject, "cannot operate on nil values");
 				curOp.obj0.value = curOp.obj0.value + curOp.obj1.value;
 				break;
 			case Executable.subID:
-				if (!this.isGoodNumVal(curOp.obj0.value) || !this.isGoodNumVal(curOp.obj1.value)) return this.hadError(returnObject, "Cannot operate on nil values");
+				if (!this.isGoodNumVal(curOp.obj0.value) ||
+					!this.isGoodNumVal(curOp.obj1.value)) return this.hadError(curOp.codeLine, returnObject, "cannot operate on nil values");
 				curOp.obj0.value = curOp.obj0.value - curOp.obj1.value;
 				break;
 			case Executable.seID:
@@ -319,7 +323,8 @@ class Executable{
 				}
 				break;
 			case Executable.andID:
-				if (!this.isGoodNumVal(curOp.obj0.value) || !this.isGoodNumVal(curOp.obj1.value)) return this.hadError(returnObject, "Cannot operate on nil values");
+				if (!this.isGoodNumVal(curOp.obj0.value) || 
+					!this.isGoodNumVal(curOp.obj1.value)) return this.hadError(curOp.codeLine, returnObject, "cannot operate on nil values");
 				if (Math.abs(curOp.obj0.value)>=0.5 && Math.abs(curOp.obj1.value)>=0.5){
 					curOp.obj0.value=1;
 				}else{
@@ -327,7 +332,8 @@ class Executable{
 				}
 				break;
 			case Executable.orID:
-				if (!this.isGoodNumVal(curOp.obj0.value) || !this.isGoodNumVal(curOp.obj1.value)) return this.hadError(returnObject, "Cannot operate on nil values");
+				if (!this.isGoodNumVal(curOp.obj0.value) || 
+					!this.isGoodNumVal(curOp.obj1.value)) return this.hadError(curOp.codeLine, returnObject, "cannot operate on nil values");
 				if (Math.abs(curOp.obj0.value)>=0.5 || Math.abs(curOp.obj1.value)>=0.5){
 					curOp.obj0.value=1;
 				}else{
@@ -375,57 +381,35 @@ class Executable{
 class Interpreter {
     constructor(owningChartObject, code){
 		this.program = new Executable();
-
-        this.errorString="";
-        this.errorCodeLine=0;
-        this.errorWasDuring=ERROR_WAS_IN.COMPILE;
-
-		this.variables=[];
-
-        this.token={type: null, value: null};
-
-        this.look="";
-        this.lookIndex=0;
-		this.codeEndIndex=0;
-		this._code="";
-		this.code=code;
-		
-		this.branchCounter=0;
-
+		this.owningChartObject=owningChartObject;
+		this.returnedValue={value: null};
 		this.eax={value: null};
 		this.ebx={value: null};
 		this.ecx={value: null};
-		this.returnedValue={value: null};
-
-		this.chartObjectArray=[];
-		this.owningChartObject=owningChartObject;
-
-		this._isCompiled=false;
+		this.code=code;
     }
 
     set code(value){
-		this.program.clear();
-        this.errorString="";
-        this.errorCodeLine=1;
-        this.errorWasDuring=ERROR_WAS_IN.COMPILE;
-		this.variables=[];
+		this._code=value;
+
 		this.token={type: null, value: null};
-        this._code=value;
         this.lookIndex=0;
         this.look=this._code[0];
 		this.codeEndIndex=this._code.length;
+
 		this.errorString="";
 		this.errorCodeLine=1;
 		this.errorWasDuring=ERROR_WAS_IN.COMPILE;
+
+		this.program.reset();
 		this.variables=[];
 		this.branchCounter=0;
-		this._isCompiled=false;
     }
     get code(){ return this._code; }
     
     getPhaseOfError(){ return this.errorWasDuring; }
     getErrorMessage(){ return this.errorString; }
-    getErrorLine(){ return this.errorLine;}
+    getErrorLine(){ return this.errorCodeLine;}
 
 	setError(msg){
 		this.errorString=msg;
@@ -901,7 +885,7 @@ class Interpreter {
 	doIdent(){
 		let identName = this.token.value;
 		let identObj = this.getIdentObject(identName);
-		if (!identObj) return this.setError("Identifier doesnt exist '"+identName+"!");
+		if (!identObj) return this.setError("Identifier doesnt exist '"+identName+"'!");
 		this.program.newMov(this.eax, identObj);
 		return this.match(TokenType.Ident);
 	}
@@ -933,10 +917,10 @@ class Interpreter {
 			this.program.newNeg(this.eax);
 			return true;
 		case TokenType.True:
-			this.program.newMov(this.eax, true);
+			this.program.newMov(this.eax, 1);
 			return this.match(TokenType.True);
 		case TokenType.False:
-			this.program.newMov(this.eax, false);
+			this.program.newMov(this.eax, 0);
 			return this.match(TokenType.False);
 		case TokenType.Not:
 			if (!this.match(TokenType.Not)) return false;
@@ -988,7 +972,7 @@ class Interpreter {
 			case TokenType.Divide:
 				if (!this.match(TokenType.Divide)) return false;
 				if (!this.doPower()) return false;
-				this.program.newMove(this.ebx, this.eax);
+				this.program.newMov(this.ebx, this.eax);
 				this.program.newPop(this.eax);
 				this.program.newDiv(this.eax, this.ebx);
 				break;
@@ -1148,7 +1132,7 @@ class Interpreter {
 		while (notDone){
 			notDone=false;
 			let varName = this.token.value;
-			if (!this.addVariable(varName, false, null)) return false;
+			if (!this.addVariable(varName, null)) return false;
 			if (!this.match(TokenType.Ident)) return false;
 			if (this.token.type === TokenType.Assignment){
 				if (!this.doAssignmentWithName(varName)) return false;
@@ -1275,23 +1259,18 @@ class Interpreter {
 			if (!this.doBlock(null, false)) return false;
 			this.errorWasDuring=ERROR_WAS_IN.LINKING;
 			if (!this.program.link()) return this.setError("Linking failed");
-			this._isCompiled=true;
 			return true;
 		}
 		return false;
 	}
 
-	run(initialThisValue){
+	run(chartObjectArray, initialThisValue, timeoutTime=5000){
+		if (!this.compile(chartObjectArray)) return null;
+
 		this.returnedValue.value=initialThisValue;
-		if (!this._isCompiled){
-			if (!this.compile()){
-				return null;
-			}
-		}
-		for (let curVar of this.variables){
-			curVar.value=null;
-		}
-		if (!this.program.execute(this.returnedValue, console.log, 5000)){
+
+		if (!this.program.execute(this.returnedValue, console.log, timeoutTime)){
+			this.errorWasDuring=ERROR_WAS_IN.EXECUTION;
 			this.setError(this.program.errorString);
 			return null;
 		}
