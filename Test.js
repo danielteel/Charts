@@ -14,6 +14,6 @@ let {
  } = require(('./ChartObjects.js'));
 
 
- let newScript = ChartScript("test","return 1+2;");
+ let newScript = new ChartScript("test","return 5+2;");
 newScript.calc();
  console.log(newScript.value);

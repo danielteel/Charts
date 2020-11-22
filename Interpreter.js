@@ -360,6 +360,8 @@ class Executable{
 
 class Interpreter {
     constructor(owningChartObject, code){
+		this.program = new Executable();
+
         this.errorString="";
         this.errorCodeLine=0;
         this.errorWasDuring=ERROR_WAS_IN.COMPILE;
@@ -385,8 +387,6 @@ class Interpreter {
 		this.owningChartObject=owningChartObject;
 
 		this._isCompiled=false;
-
-		this.program = new Executable();
     }
 
     set code(value){
@@ -398,8 +398,8 @@ class Interpreter {
 		this.token={type: null, value: null};
         this._code=value;
         this.lookIndex=0;
-        this.look=code[0];
-		this.codeEndIndex=code.length;
+        this.look=this._code[0];
+		this.codeEndIndex=this._code.length;
 		this.errorString="";
 		this.errorCodeLine=1;
 		this.errorWasDuring=ERROR_WAS_IN.COMPILE;
@@ -419,7 +419,7 @@ class Interpreter {
 	}
 
     setToken(type, value=null){
-        this.token.type=token;
+        this.token.type=type;
         this.token.value=value;
     }
 
@@ -439,11 +439,11 @@ class Interpreter {
 	}
 
     isNotEnd(){
-        return this.lookIndex<=this.codeEndIndex;
+        return this.lookIndex<this.codeEndIndex;
     }
 
     getChar(){
-        if (isNotEnd()){
+        if (this.isNotEnd()){
             this.lookIndex++;
             this.look=this._code[this.lookIndex];
         }
@@ -897,7 +897,7 @@ class Interpreter {
 		case TokenType.Constant:
 			if (typeof this.token.value !== "number") return this.setError("Null constant");
 			this.program.newMov(this.eax, this.token.value);
-			return match(TokenType.Constant);
+			return this.match(TokenType.Constant);
 		case TokenType.Ident:
 			return this.doIdent();
 		case TokenType.ChartCall:
@@ -987,12 +987,14 @@ class Interpreter {
 				if (!this.doTerm()) return false;
 				this.program.newPop(this.ebx);
 				this.program.newAdd(this.eax, this.ebx);
+				break;
 			case TokenType.Minus:
 				if (!this.match(TokenType.Minus)) return false;
 				if (!this.doTerm()) return false;
 				this.program.newPop(this.ebx);
 				this.program.newSub(this.eax, this.ebx);
 				this.program.newNeg(this.eax);
+				break;
 			}
 		}
 		return true;
@@ -1274,3 +1276,6 @@ class Interpreter {
 		return this.returnedValue.value;
 	}
 }
+
+
+module.exports = Interpreter;
