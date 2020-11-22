@@ -22,6 +22,8 @@ class Executable{
 	static pushID=3;
 	static popID=4;
 	static cmpID=5;
+	static jeID=27;
+	static jneID=28;
 	static jaID=6;
 	static jbID=7;
 	static movID=8;
@@ -35,9 +37,17 @@ class Executable{
 	static divID=16;
 	static addID=17;
 	static subID=18;
+	static seID=19;
+	static sneID=20;
+	static saID=21;
+	static saeID=22;
+	static sbID=23;
+	static sbeID=24;
+	static andID=25;
+	static orID=26;
 	
-	static newOp(type, ...stuff){
-		let retObj={type: type};
+	static newOp(type, codeLine, ...stuff){
+		let retObj={type: type, codeLine: codeLine};
 		for (let i=0;i<stuff.length;i++){
 			if (typeof stuff[i] !== "object" || Array.isArray(stuff[i])) stuff[i]={value: stuff[i]};
 			retObj["obj"+i]=stuff[i];
@@ -47,6 +57,7 @@ class Executable{
 	
 	constructor(){
 		this._opCodes=[];
+		this.currentCodeLine=1;
 	}
 	
 	clear(){
@@ -57,24 +68,35 @@ class Executable{
 		return [...this._opCodes];
 	}
 
-	newNeg(objToNeg){ this._opCodes.push(Executable.newOp(Executable.negID, objToNeg)); }
-	newLabel(labelId){ this._opCodes.push(Executable.newOp(Executable.lblID, labelId)); }
-	newPush(objToPush){ this._opCodes.push(Executable.newOp(Executable.pushID, objToPush)); }
-	newPop(popIntoThisObj){ this._opCodes.push(Executable.newOp(Executable.popID, popIntoThisObj)); }
-	newCmp(objA, objB){ this._opCodes.push(Executable.newOp(Executable.cmpID, objA, objB)); }
-	newJA(branch){ this._opCodes.push(Executable.newOp(Executable.jaID, branch));}
-	newJB(jumpToThisBranchId){ this._opCodes.push(Executable.newOp(Executable.jbID, jumpToThisBranchId)); }
-	newMov(recvObj, sendObj){ this._opCodes.push(Executable.newOp(Executable.movID, recvObj, sendObj)); }
-	newTrendCall(chart, returnObj, objA, objB, objC){ this._opCodes.push(Executable.newOp(Executable.trendID, returnObj, objA, objB, objC)); }
-	newLinearCall(chart, returnObj, objA, objB){ this._opCodes.push(Executable.newOp(Executable.linearID, returnObj, objA, objB)); }
-	newPolyCall(chart, returnObj, objA, objB){ this._opCodes.push(Executable.newOp(Executable.polyID, returnObj, objA, objB)); }
-	newClampCall(chart, returnObj, objA, objB){ this._opCodes.push(Executable.newOp(Executable.clampID, returnObj, objA, objB)); }
-	newNot(objToNot){ this._opCodes.push(Executable.newOp(Executable.notID, objToNot)); }
-	newExponent(recvObj, exponentObj){ this._opCodes.push(Executable.newOp(Executable.exponentID, recvObj, exponentObj)); }
-	newMul(recvObj, multiplyByObj){ this._opCodes.push(Executable.newOp(Executable.mulID, recvObj, multiplyByObj)); }
-	newDiv(recvObj, divideByObj){ this._opCodes.push(Executable.newOp(Executable.divID, recvObj, divideByObj)); }
-	newAdd(recvObj, addThisObj){ this._opCodes.push(Executable.newOp(Executable.addID, recvObj, addThisObj)); }
-	newSub(recvObj, subtractThisObj){ this._opCodes.push(Executable.newOp(Executable.subID, recvObj, subtractThisObj)); }
+	newNeg(objToNeg){ this._opCodes.push(Executable.newOp(Executable.negID, this.currentCodeLine, objToNeg)); }
+	newLabel(labelId){ this._opCodes.push(Executable.newOp(Executable.lblID, this.currentCodeLine, labelId)); }
+	newPush(objToPush){ this._opCodes.push(Executable.newOp(Executable.pushID, this.currentCodeLine, objToPush)); }
+	newPop(popIntoThisObj){ this._opCodes.push(Executable.newOp(Executable.popID, this.currentCodeLine, popIntoThisObj)); }
+	newCmp(objA, objB){ this._opCodes.push(Executable.newOp(Executable.cmpID, this.currentCodeLine, objA, objB)); }
+	newJA(jumpToThisBranchId){ this._opCodes.push(Executable.newOp(Executable.jaID, this.currentCodeLine, jumpToThisBranchId));}
+	newJB(jumpToThisBranchId){ this._opCodes.push(Executable.newOp(Executable.jbID, this.currentCodeLine, jumpToThisBranchId)); }
+	newMov(recvObj, sendObj){ this._opCodes.push(Executable.newOp(Executable.movID, this.currentCodeLine, recvObj, sendObj)); }
+	newTrendCall(chart, returnObj, objA, objB, objC){ this._opCodes.push(Executable.newOp(Executable.trendID, this.currentCodeLine, returnObj, objA, objB, objC)); }
+	newLinearCall(chart, returnObj, objA, objB){ this._opCodes.push(Executable.newOp(Executable.linearID, this.currentCodeLine, returnObj, objA, objB)); }
+	newPolyCall(chart, returnObj, objA, objB){ this._opCodes.push(Executable.newOp(Executable.polyID, this.currentCodeLine, returnObj, objA, objB)); }
+	newClampCall(chart, returnObj, objA, objB){ this._opCodes.push(Executable.newOp(Executable.clampID, this.currentCodeLine, returnObj, objA, objB)); }
+	newNot(objToNot){ this._opCodes.push(Executable.newOp(Executable.notID, this.currentCodeLine, objToNot)); }
+	newExponent(recvObj, exponentObj){ this._opCodes.push(Executable.newOp(Executable.exponentID, this.currentCodeLine, recvObj, exponentObj)); }
+	newMul(recvObj, multiplyByObj){ this._opCodes.push(Executable.newOp(Executable.mulID, this.currentCodeLine, recvObj, multiplyByObj)); }
+	newDiv(recvObj, divideByObj){ this._opCodes.push(Executable.newOp(Executable.divID, this.currentCodeLine, recvObj, divideByObj)); }
+	newAdd(recvObj, addThisObj){ this._opCodes.push(Executable.newOp(Executable.addID, this.currentCodeLine, recvObj, addThisObj)); }
+	newSub(recvObj, subtractThisObj) {this._opCodes.push(Executable.newOp(Executable.subID, this.currentCodeLine, recvObj, subtractThisObj));}
+	newSE(setThisObj) {this._opCodes.push(Executable.newOp(Executable.seID, this.currentCodeLine, setThisObj));}
+	newSNE(setThisObj) {this._opCodes.push(Executable.newOp(Executable.sneID, this.currentCodeLine, setThisObj));}
+	newSA(setThisObj) {this._opCodes.push(Executable.newOp(Executable.saID, this.currentCodeLine, setThisObj));}
+	newSAE(setThisObj) {this._opCodes.push(Executable.newOp(Executable.saeID, this.currentCodeLine, setThisObj));}
+	newSB(setThisObj) {this._opCodes.push(Executable.newOp(Executable.sbID, this.currentCodeLine, setThisObj));}
+	newSBE(setThisObj) {this._opCodes.push(Executable.newOp(Executable.sbeID, this.currentCodeLine, setThisObj));}
+	newAnd(recvObj, otherObj) {this._opCodes.push(Executable.newOp(Executable.andID, this.currentCodeLine, recvObj, otherObj));}
+	newOr(recvObj, otherObj) {this._opCodes.push(Executable.newOp(Executable.orID, this.currentCodeLine, recvObj, otherObj));}
+	newJE(jumpToThisBranchId) {this._opCodes.push(Executable.newOp(Executable.jeID, this.currentCodeLine, jumpToThisBranchId));}
+	newJNE(jumpToThisBranchId) {this._opCodes.push(Executable.newOp(Executable.jneID, this.currentCodeLine, jumpToThisBranchId));}
+
 }
 
 class Interpreter {
@@ -140,15 +162,16 @@ class Interpreter {
 
     getChar(){
         if (isNotEnd()){
-            lookIndex++;
-            this.look=this._code[lookIndex];
+            this.lookIndex++;
+            this.look=this._code[this.lookIndex];
         }
 	}
 	
 	skipWhite(){
 		while (this.isNotEnd() && this.isSpace(this.look)) {
 			if (this.look === '\n') {
-				errorCodeLine++;
+				this.errorCodeLine++;
+				this.program.currentCodeLine=this.errorCodeLine;
 			}
 			this.getChar();
 		}
@@ -648,106 +671,85 @@ class Interpreter {
 		}
 		return true;
 	}
-}
 
-
-bool Interpreter::doTerm() {
-	if (!doPower()) return false;
-	while (isTermOp()) {
-		addOp(ROperation::newPush(errorCodeLine, &eax));
-		switch (token->type) {
-		case TokenType::Multiply:
-			if (!match(TokenType::Multiply)) return false;
-			if (!doPower()) return false;
-			addOp(ROperation::newPop(errorCodeLine, &ebx));
-			addOp(ROperation::newMul(errorCodeLine, &eax, &ebx));
-			break;
-		case TokenType::Divide:
-			if (!match(TokenType::Divide)) return false;
-			if (!doPower()) return false;
-			addOp(ROperation::newMov(errorCodeLine, &ebx, &eax));
-			addOp(ROperation::newPop(errorCodeLine, &eax));
-			addOp(ROperation::newDiv(errorCodeLine, &eax, &ebx));
-			break;
+	doTerm(){
+		if (!this.doPower()) return false;
+		while (this.isTermOp()){
+			this.program.newPush(this.eax);
+			switch (this.token.type){
+			case TokenType.Multiply:
+				if (!this.match(TokenType.Multiply)) return false;
+				if (!this.doPower()) return false;
+				this.program.newPop(this.ebx);
+				this.program.newMul(this.eax, this.ebx);
+				break;
+			case TokenType.Divide:
+				if (!this.match(TokenType.Divide)) return false;
+				if (!this.doPower()) return false;
+				this.program.newMove(this.ebx, this.eax);
+				this.program.newPop(this.eax);
+				this.program.newDiv(this.eax, this.ebx);
+				break;
+			}
 		}
+		return true;
 	}
-	return true;
+
+	doAdd(){
+		if (!this.doTerm()) return false;
+		while (this.isAddOp()){
+			this.program.newPush(this.eax);
+			switch (this.token.type){
+			case TokenType.Plus:
+				if (!this.match(TokenType.Plus)) return false;
+				if (!this.doTerm()) return false;
+				this.program.newPop(this.ebx);
+				this.program.newAdd(this.eax, this.ebx);
+			case TokenType.Minus:
+				if (!this.match(TokenType.Minus)) return false;
+				if (!this.doTerm()) return false;
+				this.program.newPop(this.ebx);
+				this.program.newSub(this.eax, this.ebx);
+				this.program.newNeg(this.eax);
+			}
+		}
+		return true;
+	}
+
+	doCompare(){
+		if (!this.doAdd()) return false;
+		while (this.isCompareOp()){
+			this.program.newPush(this.eax);
+			let compareType=this.token.type;
+			if (!this.match(compareType)) return false;
+			if (!this.doAdd()) return false;
+			this.program.newPop(this.ebx);
+			this.program.newCmp(this.ebx, this.eax);
+			switch (compareType){
+			case TokenType.Equals:
+				this.program.newSE(this.eax);
+				break;
+			case TokenType.NotEquals:
+				this.program.newSNE(this.eax);
+				break;
+			case TokenType.Greater:
+				this.program.newSA(this.eax);
+				break;
+			case TokenType.GreaterEquals:
+				this.program.newSAE(this.eax);
+				break;
+			case TokenType.Lesser:
+				this.program.newSB(this.eax);
+				break;
+			case TokenType.LesserEquals:
+				this.program.newSBE(this.eax);
+				break;
+			}
+		}
+		return true;
+	}
 }
 
-bool Interpreter::doAdd() {
-	if (!doTerm()) return false;
-	while (isAddOp()) {
-		addOp(ROperation::newPush(errorCodeLine, &eax));
-		switch (token->type) {
-		case TokenType::Plus:
-			if (!match(TokenType::Plus)) return false;
-			if (!doTerm()) return false;
-			addOp(ROperation::newPop(errorCodeLine, &ebx));
-			addOp(ROperation::newAdd(errorCodeLine, &eax, &ebx));
-			break;
-		case TokenType::Minus:
-			if (!match(TokenType::Minus)) return false;
-			if (!doTerm()) return false;
-			addOp(ROperation::newPop(errorCodeLine, &ebx));
-			addOp(ROperation::newSub(errorCodeLine, &eax,&ebx));
-			addOp(ROperation::newNeg(errorCodeLine, &eax));
-			break;
-		}
-	}
-	return true;
-}
-
-bool Interpreter::doCompare() {
-	if (!doAdd()) return false;
-	while (isCompareOp()) {
-		addOp(ROperation::newPush(errorCodeLine, &eax));
-		switch (token->type) {
-		case TokenType::Equals:
-			if (!match(TokenType::Equals)) return false;
-			if (!doAdd()) return false;
-			addOp(ROperation::newPop(errorCodeLine, &ebx));
-			addOp(ROperation::newCmp(errorCodeLine, &ebx, &eax));
-			addOp(ROperation::newSE(errorCodeLine, &eax));
-			break;
-		case TokenType::NotEquals:
-			if (!match(TokenType::NotEquals)) return false;
-			if (!doAdd()) return false;
-			addOp(ROperation::newPop(errorCodeLine, &ebx));
-			addOp(ROperation::newCmp(errorCodeLine, &ebx, &eax));
-			addOp(ROperation::newSNE(errorCodeLine, &eax));
-			break;
-		case TokenType::Greater:
-			if (!match(TokenType::Greater)) return false;
-			if (!doAdd()) return false;
-			addOp(ROperation::newPop(errorCodeLine, &ebx));
-			addOp(ROperation::newCmp(errorCodeLine, &ebx, &eax));
-			addOp(ROperation::newSA(errorCodeLine, &eax));
-			break;
-		case TokenType::GreaterEquals:
-			if (!match(TokenType::GreaterEquals)) return false;
-			if (!doAdd()) return false;
-			addOp(ROperation::newPop(errorCodeLine, &ebx));
-			addOp(ROperation::newCmp(errorCodeLine, &ebx, &eax));
-			addOp(ROperation::newSAE(errorCodeLine, &eax));
-			break;
-		case TokenType::Lesser:
-			if (!match(TokenType::Lesser)) return false;
-			if (!doAdd()) return false;
-			addOp(ROperation::newPop(errorCodeLine, &ebx));
-			addOp(ROperation::newCmp(errorCodeLine, &ebx, &eax));
-			addOp(ROperation::newSB(errorCodeLine, &eax));
-			break;
-		case TokenType::LesserEquals:
-			if (!match(TokenType::LesserEquals)) return false;
-			if (!doAdd()) return false;
-			addOp(ROperation::newPop(errorCodeLine, &ebx));
-			addOp(ROperation::newCmp(errorCodeLine, &ebx, &eax));
-			addOp(ROperation::newSBE(errorCodeLine, &eax));
-			break;
-		}
-	}
-	return true;
-}
 
 
 bool Interpreter::doAnd() {
