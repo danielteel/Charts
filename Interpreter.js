@@ -4,16 +4,11 @@ const TokenType =  {
     NotEquals:"!=",Lesser:"<",Greater:">",LesserEquals:"<=",GreaterEquals:">=",
     FuncMin:"min",FuncMax:"max",FuncAbs:"abs",FuncClamp:"clamp",FuncBoolIsNil:"isnil",
     While:"while",If:"if",LeftCurly:"{",RightCurly:"}",Return:"return",Else:"else",
-    Break:"break",LineDelim:";",Not:"!",And:"&&",Or:"||",Comma:",",Double:"double",
+    Break:"break",LineDelim:";",Not:"!",And:"&&",Or:"||",Comma:",",Let:"let",
     True:"true",False:"false",Nil:"nil",ChartCall:"@",This:"this",String:"string",
-    MsgBox:"msgbox"
+    MsgBox:"msgbox", Mod:"%", FuncFloor:"floor", FuncCeil:"ceil"
 };
 
-const ERROR_WAS_IN = {
-    COMPILE: "compile",
-    LINKING: "linking",
-    EXECUTION: "execution"
-}
 
 function isAnyNil(...vals){
     for (let a of vals){
@@ -67,11 +62,25 @@ class Executable{
 	static retID=31;
 	static msgboxID=32;
 	static isnilID=33;
+	static modID=34;
+	static floorID=35;
+	static ceilID=36;
 	
-	static newOp(type, codeLine, ...stuff){
-		let retObj={type: type, codeLine: codeLine};
+	static newOp(type, codeLine, op, ...stuff){
+		let retObj={type: type, codeLine: codeLine, op: op};
 		for (let i=0;i<stuff.length;i++){
-			if (typeof stuff[i] !== "object" || stuff[i]===null || Array.isArray(stuff[i])) stuff[i]={value: stuff[i]};
+			if (typeof stuff[i] !== "object" || stuff[i]===null){
+				let valType="num";
+				switch (typeof stuff[i]){
+				case "boolean":
+					valType="bool";
+					break;
+				case "string":
+					valType="str";
+					break;
+				}
+				stuff[i]={value: stuff[i], valType: valType, isConstant: true};
+			}
 			retObj["obj"+i]=stuff[i];
 		}
 		return retObj;
@@ -82,43 +91,47 @@ class Executable{
 		this.currentCodeLine=1;
 		this._hadLinkError=false;
 		this._isLinked=false;
+		this._isOptimized=false;
 		this._errorString="";
 		this._errorOnLine=0;
 	}
 
-	newNeg(objToNeg){ this._opCodes.push(Executable.newOp(Executable.negID, this.currentCodeLine, objToNeg)); }
-	newLabel(labelId){ this._opCodes.push(Executable.newOp(Executable.lblID, this.currentCodeLine, labelId)); }
-	newPush(objToPush){ this._opCodes.push(Executable.newOp(Executable.pushID, this.currentCodeLine, objToPush)); }
-	newPop(popIntoThisObj){ this._opCodes.push(Executable.newOp(Executable.popID, this.currentCodeLine, popIntoThisObj)); }
-	newCmp(objA, objB){ this._opCodes.push(Executable.newOp(Executable.cmpID, this.currentCodeLine, objA, objB)); }
-	newJA(jumpToThisBranchId){ this._opCodes.push(Executable.newOp(Executable.jaID, this.currentCodeLine, jumpToThisBranchId));}
-	newJB(jumpToThisBranchId){ this._opCodes.push(Executable.newOp(Executable.jbID, this.currentCodeLine, jumpToThisBranchId)); }
-	newMov(recvObj, sendObj){ this._opCodes.push(Executable.newOp(Executable.movID, this.currentCodeLine, recvObj, sendObj)); }
-	newTrendCall(chart, returnObj, objA, objB, objC){ this._opCodes.push(Executable.newOp(Executable.trendID, this.currentCodeLine, returnObj, objA, objB, objC)); }
-	newLinearCall(chart, returnObj, objA, objB){ this._opCodes.push(Executable.newOp(Executable.linearID, this.currentCodeLine, returnObj, objA, objB)); }
-	newPolyCall(chart, returnObj, objA, objB){ this._opCodes.push(Executable.newOp(Executable.polyID, this.currentCodeLine, returnObj, objA, objB)); }
-	newClampCall(chart, returnObj, objA, objB){ this._opCodes.push(Executable.newOp(Executable.clampID, this.currentCodeLine, returnObj, objA, objB)); }
-	newNot(objToNot){ this._opCodes.push(Executable.newOp(Executable.notID, this.currentCodeLine, objToNot)); }
-	newExponent(recvObj, exponentObj){ this._opCodes.push(Executable.newOp(Executable.exponentID, this.currentCodeLine, recvObj, exponentObj)); }
-	newMul(recvObj, multiplyByObj){ this._opCodes.push(Executable.newOp(Executable.mulID, this.currentCodeLine, recvObj, multiplyByObj)); }
-	newDiv(recvObj, divideByObj){ this._opCodes.push(Executable.newOp(Executable.divID, this.currentCodeLine, recvObj, divideByObj)); }
-	newAdd(recvObj, addThisObj){ this._opCodes.push(Executable.newOp(Executable.addID, this.currentCodeLine, recvObj, addThisObj)); }
-	newSub(recvObj, subtractThisObj) {this._opCodes.push(Executable.newOp(Executable.subID, this.currentCodeLine, recvObj, subtractThisObj));}
-	newSE(setThisObj) {this._opCodes.push(Executable.newOp(Executable.seID, this.currentCodeLine, setThisObj));}
-	newSNE(setThisObj) {this._opCodes.push(Executable.newOp(Executable.sneID, this.currentCodeLine, setThisObj));}
-	newSA(setThisObj) {this._opCodes.push(Executable.newOp(Executable.saID, this.currentCodeLine, setThisObj));}
-	newSAE(setThisObj) {this._opCodes.push(Executable.newOp(Executable.saeID, this.currentCodeLine, setThisObj));}
-	newSB(setThisObj) {this._opCodes.push(Executable.newOp(Executable.sbID, this.currentCodeLine, setThisObj));}
-	newSBE(setThisObj) {this._opCodes.push(Executable.newOp(Executable.sbeID, this.currentCodeLine, setThisObj));}
-	newAnd(recvObj, otherObj) {this._opCodes.push(Executable.newOp(Executable.andID, this.currentCodeLine, recvObj, otherObj));}
-	newOr(recvObj, otherObj) {this._opCodes.push(Executable.newOp(Executable.orID, this.currentCodeLine, recvObj, otherObj));}
-	newJE(jumpToThisBranchId) {this._opCodes.push(Executable.newOp(Executable.jeID, this.currentCodeLine, jumpToThisBranchId));}
-	newJNE(jumpToThisBranchId) {this._opCodes.push(Executable.newOp(Executable.jneID, this.currentCodeLine, jumpToThisBranchId));}
-	newTest(testObj) {this._opCodes.push(Executable.newOp(Executable.testID, this.currentCodeLine, testObj));}
-	newJmp(jumpToThisBranchId) {this._opCodes.push(Executable.newOp(Executable.jmpID, this.currentCodeLine, jumpToThisBranchId));}
-	newRet(retObj) {this._opCodes.push(Executable.newOp(Executable.retID, this.currentCodeLine, retObj));}
-	newMsgBox(stringToShow) {this._opCodes.push(Executable.newOp(Executable.msgboxID, this.currentCodeLine, stringToShow));}
-	newIsNil(recvObj, identObj) {this._opCodes.push(Executable.newOp(Executable.isnilID, this.currentCodeLine, recvObj, identObj));}
+	newNeg(objToNeg){ this._opCodes.push(Executable.newOp(Executable.negID, this.currentCodeLine, "neg", objToNeg)); }
+	newLabel(labelId){ this._opCodes.push(Executable.newOp(Executable.lblID, this.currentCodeLine, "lbl", labelId)); }
+	newPush(objToPush){ this._opCodes.push(Executable.newOp(Executable.pushID, this.currentCodeLine, "push", objToPush)); }
+	newPop(popIntoThisObj){ this._opCodes.push(Executable.newOp(Executable.popID, this.currentCodeLine, "pop", popIntoThisObj)); }
+	newCmp(objA, objB){ this._opCodes.push(Executable.newOp(Executable.cmpID, this.currentCodeLine, "cmp", objA, objB)); }
+	newJA(jumpToThisBranchId){ this._opCodes.push(Executable.newOp(Executable.jaID, this.currentCodeLine, "ja", jumpToThisBranchId));}
+	newJB(jumpToThisBranchId){ this._opCodes.push(Executable.newOp(Executable.jbID, this.currentCodeLine, "jb", jumpToThisBranchId)); }
+	newMov(recvObj, sendObj){ this._opCodes.push(Executable.newOp(Executable.movID, this.currentCodeLine, "mov", recvObj, sendObj)); }
+	newTrendCall(chart, returnObj, objA, objB, objC){ this._opCodes.push(Executable.newOp(Executable.trendID, this.currentCodeLine, "trend", returnObj, objA, objB, objC)); }
+	newLinearCall(chart, returnObj, objA, objB){ this._opCodes.push(Executable.newOp(Executable.linearID, this.currentCodeLine, "linear", returnObj, objA, objB)); }
+	newPolyCall(chart, returnObj, objA, objB){ this._opCodes.push(Executable.newOp(Executable.polyID, this.currentCodeLine, "poly", returnObj, objA, objB)); }
+	newClampCall(chart, returnObj, objA, objB){ this._opCodes.push(Executable.newOp(Executable.clampID, this.currentCodeLine, "clamp", returnObj, objA, objB)); }
+	newNot(objToNot){ this._opCodes.push(Executable.newOp(Executable.notID, this.currentCodeLine, "not", objToNot)); }
+	newExponent(recvObj, exponentObj){ this._opCodes.push(Executable.newOp(Executable.exponentID, this.currentCodeLine, "pow", recvObj, exponentObj)); }
+	newMul(recvObj, multiplyByObj){ this._opCodes.push(Executable.newOp(Executable.mulID, this.currentCodeLine, "mul", recvObj, multiplyByObj)); }
+	newDiv(recvObj, divideByObj){ this._opCodes.push(Executable.newOp(Executable.divID, this.currentCodeLine, "div", recvObj, divideByObj)); }
+	newAdd(recvObj, addThisObj){ this._opCodes.push(Executable.newOp(Executable.addID, this.currentCodeLine, "add", recvObj, addThisObj)); }
+	newSub(recvObj, subtractThisObj) {this._opCodes.push(Executable.newOp(Executable.subID, this.currentCodeLine, "sub", recvObj, subtractThisObj));}
+	newSE(setThisObj) {this._opCodes.push(Executable.newOp(Executable.seID, this.currentCodeLine, "se", setThisObj));}
+	newSNE(setThisObj) {this._opCodes.push(Executable.newOp(Executable.sneID, this.currentCodeLine, "sne", setThisObj));}
+	newSA(setThisObj) {this._opCodes.push(Executable.newOp(Executable.saID, this.currentCodeLine, "sa", setThisObj));}
+	newSAE(setThisObj) {this._opCodes.push(Executable.newOp(Executable.saeID, this.currentCodeLine, "sae", setThisObj));}
+	newSB(setThisObj) {this._opCodes.push(Executable.newOp(Executable.sbID, this.currentCodeLine, "sb", setThisObj));}
+	newSBE(setThisObj) {this._opCodes.push(Executable.newOp(Executable.sbeID, this.currentCodeLine, "sbe", setThisObj));}
+	newAnd(recvObj, otherObj) {this._opCodes.push(Executable.newOp(Executable.andID, this.currentCodeLine, "and", recvObj, otherObj));}
+	newOr(recvObj, otherObj) {this._opCodes.push(Executable.newOp(Executable.orID, this.currentCodeLine, "or", recvObj, otherObj));}
+	newJE(jumpToThisBranchId) {this._opCodes.push(Executable.newOp(Executable.jeID, this.currentCodeLine, "je", jumpToThisBranchId));}
+	newJNE(jumpToThisBranchId) {this._opCodes.push(Executable.newOp(Executable.jneID, this.currentCodeLine, "jne", jumpToThisBranchId));}
+	newTest(testObj) {this._opCodes.push(Executable.newOp(Executable.testID, this.currentCodeLine, "test", testObj));}
+	newJmp(jumpToThisBranchId) {this._opCodes.push(Executable.newOp(Executable.jmpID, this.currentCodeLine, "jmp", jumpToThisBranchId));}
+	newRet(retObj) {this._opCodes.push(Executable.newOp(Executable.retID, this.currentCodeLine, "ret", retObj));}
+	newMsgBox(stringToShow) {this._opCodes.push(Executable.newOp(Executable.msgboxID, this.currentCodeLine, "msgbox", stringToShow));}
+	newIsNil(recvObj, identObj) {this._opCodes.push(Executable.newOp(Executable.isnilID, this.currentCodeLine, "isnil", recvObj, identObj));}
+	newMod(recvObj, divideByObj){this._opCodes.push(Executable.newOp(Executable.modID, this.currentCodeLine, "mod", recvObj, divideByObj));}
+	newFloor(objToFloor){this._opCodes.push(Executable.newOp(Executable.floorID, this.currentCodeLine, "floor", objToFloor));}
+	newCeil(objToCeil){this._opCodes.push(Executable.newOp(Executable.ceilID, this.currentCodeLine, "ceil", objToCeil));}
 
 
 	reset(){
@@ -126,6 +139,7 @@ class Executable{
 		this.currentCodeLine=1;
 		this._hadLinkError=false;
 		this._isLinked=false;
+		this._isOptimized=false;
 		this._errorString="";
 		this._errorOnLine=0;
 	}
@@ -141,7 +155,7 @@ class Executable{
 	}
 
 	isGoodNumVal(val){
-		if (val===undefined || val===null || val===NaN) return false;
+		if (val===undefined || val===null || !Number.isFinite(val) && typeof val!=="boolean") return false;
 		return true;
 	}
 
@@ -156,7 +170,97 @@ class Executable{
 		return null;
 	}
 
+	optimize(){
+		if (this._isLinked){
+			this._isOptimized=true;
+			return true;
+		}
+		if (this._isOptimized) return true;
+	
+		let stillOptimizing=true;
+		while (stillOptimizing){
+			stillOptimizing=false;
+
+			for (let i=0;i<this._opCodes.length-1;i++){
+				let cur=this._opCodes[i];
+				let next=this._opCodes[i+1];
+
+				if (cur.type===Executable.movID && next.type===Executable.movID){
+					//mov/mov
+					if (cur.obj0===next.obj1 && cur.obj1===next.obj0){
+						//mov x,y   mov y,x   =>   mov x,y
+						this._opCodes.splice(i+1,1);
+						stillOptimizing=true;
+						continue;
+					}else if (cur.obj0===next.obj1 && cur.obj0.isRegister===true){
+						//mov reg,x   mov y,reg   =>   mov y,x
+						cur.obj0=next.obj0;
+						this._opCodes.splice(i+1,1);
+						stillOptimizing=true;
+						continue;
+					}
+				}
+
+				if (cur.type===Executable.movID && next.type===Executable.pushID){
+					//mov reg,x   push reg   =>   push x
+					if (cur.obj0===next.obj0 && cur.obj0.isRegister===true){
+						next.obj0=cur.obj1;
+						this._opCodes[i]=this._opCodes[i+1];
+						this._opCodes.splice(i+1,1);
+						stillOptimizing=true;
+						continue;
+					}
+				}
+
+				if (cur.type===Executable.movID && cur.obj0.isRegister===true && cur.obj1.isConstant){
+					switch (next.type){
+					case Executable.addID:
+					case Executable.subID:
+					case Executable.mulID:
+					case Executable.divID:
+					case Executable.modID:
+					case Executable.exponentID:
+					case Executable.orID:
+					case Executable.andID:
+						if (next.obj1===cur.obj0){
+							next.obj1=cur.obj1;
+							this._opCodes.splice(i,1);
+							i++;
+							stillOptimizing=true;
+							continue;
+						}
+						break;
+					}
+				}
+
+				if (cur.type===Executable.pushID && cur.obj0.isRegister!==true){
+					//push constant
+					//pop register   =>   mov register, constant
+					let level=0;
+					for (let j=i+1;j<this._opCodes.length-1;j++){
+						if (this._opCodes[j].type===Executable.pushID) level++;
+						if (this._opCodes[j].type===Executable.popID){
+							if (level>0){
+								level--;
+							}else{
+								this._opCodes[j]=Executable.newOp(Executable.movID, this._opCodes[j].codeLine, "mov", this._opCodes[j].obj0, cur.obj0);
+								this._opCodes.splice(i,1);
+								stillOptimizing=true;
+								break;
+							}
+						}
+					}
+					if (stillOptimizing) continue;
+				}
+				
+			}
+		}
+		this._isOptimized=true;
+		return true;
+	}
+
 	link(){
+		this.optimize();
 		if (this._hadLinkError) return false;
 		if (this._isLinked) return true;
 		for (let i=0;i<this._opCodes.length;i++){
@@ -178,6 +282,11 @@ class Executable{
 		return true;
 	}
 
+	numToBool(val){
+		if (Math.abs(val)<0.5) return false;
+		return true;
+	}
+
 	execute(returnObject, messageBoxFunction, timeOutMillis){
 		let stack=[];
 		let flagA=false;
@@ -194,29 +303,162 @@ class Executable{
 			if (new Date().getTime() > maxRunTime) return this.hadError(curOp.codeLine, returnObject, "script execution took to long, timed out");
 
 			switch (curOp.type){
-			case Executable.negID:
-				if (!this.isGoodNumVal(curOp.obj0.value)) return this.hadError(curOp.codeLine, returnObject, "cannot negate nil value");
-				curOp.obj0.value=0-curOp.obj0.value;
-				break;
 			case Executable.lblID:
 				//Perform no action, essentially a nop
 				continue;
+			case Executable.modID:
+				if (!this.isGoodNumVal(curOp.obj0.value) ||
+					!this.isGoodNumVal(curOp.obj1.value)) return this.hadError(curOp.codeLine, returnObject, "cannot mod with nil value(s)");
+				curOp.obj0.value = curOp.obj0.value % curOp.obj1.value;
+				curOp.obj0.valType = "num";
+				break;
+			case Executable.floorID:
+				if (!this.isGoodNumVal(curOp.obj0.value)) return this.hadError(curOp.codeLine, returnObject, "cannot floor nil value");
+				curOp.obj0.value = Math.floor(curOp.obj0.value);
+				curOp.obj0.valType = "num";
+				break;
+			case Executable.ceilID:
+				if (!this.isGoodNumVal(curOp.obj0.value)) return this.hadError(curOp.codeLine, returnObject, "cannot ceil nil value");
+				curOp.obj0.value = Math.ceil(curOp.obj0.value);
+				curOp.obj0.valType = "num";
+				break;
+			case Executable.movID:
+				curOp.obj0.value = curOp.obj1.value;
+				curOp.obj0.valType = curOp.obj1.valType;
+				break;
+			case Executable.notID:
+				if (!this.isGoodNumVal(curOp.obj0.value)) return this.hadError(curOp.codeLine, returnObject, "cannot not nil value");
+				curOp.obj0.value = !this.numToBool(curOp.obj0.value);
+				curOp.obj0.valType = "bool";
+				break;
+			case Executable.negID:
+				if (!this.isGoodNumVal(curOp.obj0.value)) return this.hadError(curOp.codeLine, returnObject, "cannot negate nil value");
+				curOp.obj0.valType = "num";
+				curOp.obj0.value=0-curOp.obj0.value;
+				break;
+			case Executable.exponentID:
+				if (!this.isGoodNumVal(curOp.obj0.value) ||
+					!this.isGoodNumVal(curOp.obj1.value)) return this.hadError(curOp.codeLine, returnObject, "cannot raise to power with nil value(s)");
+				curOp.obj0.value = curOp.obj0.value ** curOp.obj1.value;
+				curOp.obj0.valType = "num";
+				break;
+			case Executable.mulID:
+				if (!this.isGoodNumVal(curOp.obj0.value) ||
+					!this.isGoodNumVal(curOp.obj1.value)) return this.hadError(curOp.codeLine, returnObject, "cannot multiply with nil value(s)");
+				curOp.obj0.value = curOp.obj0.value * curOp.obj1.value;
+				curOp.obj0.valType = "num";
+				break;
+			case Executable.divID:
+				if (!this.isGoodNumVal(curOp.obj0.value) ||
+					!this.isGoodNumVal(curOp.obj1.value)) return this.hadError(curOp.codeLine, returnObject, "cannot divide with nil value(s)");
+				curOp.obj0.value = curOp.obj0.value / curOp.obj1.value;
+				curOp.obj0.valType = "num";
+				break;
+			case Executable.addID:
+				if (!this.isGoodNumVal(curOp.obj0.value) ||
+					!this.isGoodNumVal(curOp.obj1.value)) return this.hadError(curOp.codeLine, returnObject, "cannot add with nil value(s)");
+				curOp.obj0.value = curOp.obj0.value + curOp.obj1.value;
+				curOp.obj0.valType = "num";
+				break;
+			case Executable.subID:
+				if (!this.isGoodNumVal(curOp.obj0.value) ||
+					!this.isGoodNumVal(curOp.obj1.value)) return this.hadError(curOp.codeLine, returnObject, "cannot sub with nil value(s)");
+				curOp.obj0.value = curOp.obj0.value - curOp.obj1.value;
+				curOp.obj0.valType = "num";
+				break;
+
+			case Executable.andID:
+				if (!this.isGoodNumVal(curOp.obj0.value) || 
+					!this.isGoodNumVal(curOp.obj1.value)) return this.hadError(curOp.codeLine, returnObject, "cannot and with nil value(s)");
+				curOp.obj0.value=this.numToBool(curOp.obj0.value) && this.numToBool(curOp.obj1.value);
+				curOp.obj0.valType="bool";
+				break;
+			case Executable.orID:
+				if (!this.isGoodNumVal(curOp.obj0.value) || 
+					!this.isGoodNumVal(curOp.obj1.value)) return this.hadError(curOp.codeLine, returnObject, "cannot or with nil value(s)");
+				curOp.obj0.value=this.numToBool(curOp.obj0.value) || this.numToBool(curOp.obj1.value);
+				curOp.obj0.valType="bool";
+				break;
+
 			case Executable.pushID:
-				stack.push(curOp.obj0.value);
+				stack.push({value: curOp.obj0.value, valType: curOp.obj0.valType});
 				break;
 			case Executable.popID:
 				if (stack.length===0) return this.hadError(returnObject, "attempted pop on empty stack");
-				curOp.obj0.value=stack.pop();
+				let poppedObj = stack.pop();
+				curOp.obj0.value=poppedObj.value;
+				curOp.obj0.valType=poppedObj.valType;
+				break;
+
+			case Executable.testID:
+				flagE=!this.numToBool(curOp.obj0.value);
 				break;
 			case Executable.cmpID:				
 				if (!this.isGoodNumVal(curOp.obj0.value) || 
-					!this.isGoodNumVal(curOp.obj1.value)) return this.hadError(curOp.codeLine, returnObject, "cannot operate on nil values");
+					!this.isGoodNumVal(curOp.obj1.value)) return this.hadError(curOp.codeLine, returnObject, "cannot cmp with nil value(s)");
+					
 				flagA=false;
 				flagB=false;
 				flagE=false;
-				if (curOp.obj0.value > curOp.obj1.value) flagA=true;
-				if (curOp.obj0.value < curOp.obj1.value) flagB=true;
-				if (isAboutEquals(curOp.obj0.value, curOp.obj1.value)) flagE=true;
+
+				if (curOp.obj0.valType==="bool" || curOp.obj1.valType==="bool"){
+					//At least one is a bool, convert both to bools and compare
+					flagE=this.numToBool(curOp.obj0.value) === this.numToBool(curOp.obj1.value);
+				}else {
+					//Both are numbers
+					if (curOp.obj0.value > curOp.obj1.value) flagA=true;
+					if (curOp.obj0.value < curOp.obj1.value) flagB=true;
+					if (isAboutEquals(curOp.obj0.value, curOp.obj1.value)) flagE=true;
+				}
+				break;
+			case Executable.trendID:
+				if (!this.isGoodNumVal(curOp.obj2.value) || 
+					!this.isGoodNumVal(curOp.obj3.value) ||
+					!this.isGoodNumVal(curOp.obj4.value)) return this.hadError(curOp.codeLine, returnObject, "cannot figureTrend with nil value(s)");
+				curOp.obj1.value = curOp.obj0.figureTrend(curOp.obj2.value, curOp.obj3.value, curOp.obj4.value);
+				curOp.obj1.valType = "num";
+				break;
+			case Executable.linearID:
+				if (!this.isGoodNumVal(curOp.obj2.value) || 
+					!this.isGoodNumVal(curOp.obj3.value)) return this.hadError(curOp.codeLine, returnObject, "cannot figureChart with nil value(s)");
+				curOp.obj1.value = curOp.obj0.figureChart(curOp.obj2.value, curOp.obj3.value);
+				curOp.obj1.valType = "num";
+				break;
+			case Executable.polyID:
+				if (!this.isGoodNumVal(curOp.obj2.value) || 
+					!this.isGoodNumVal(curOp.obj3.value)) return this.hadError(curOp.codeLine, returnObject, "cannot figurePoly with nil value(s)");
+				curOp.obj1.value = curOp.obj0.figurePoly(curOp.obj2.value, curOp.obj3.value);
+				curOp.obj1.valType = "num";
+				break;
+			case Executable.clampID:
+				if (!this.isGoodNumVal(curOp.obj2.value) || 
+					!this.isGoodNumVal(curOp.obj3.value)) return this.hadError(curOp.codeLine, returnObject, "cannot figureClamp with nil value(s)");
+				curOp.obj1.value = curOp.obj0.figureClamp(curOp.obj2.value, curOp.obj3.value);
+				curOp.obj1.valType = "num";
+				break;
+			case Executable.seID:
+				curOp.obj0.valType="bool";
+				curOp.obj0.value=flagE;
+				break;
+			case Executable.sneID:
+				curOp.obj0.valType="bool";
+				curOp.obj0.value=!flagE;
+				break;
+			case Executable.saID:
+				curOp.obj0.valType="bool";
+				curOp.obj0.value=flagA;
+				break;
+			case Executable.saeID:
+				curOp.obj0.valType="bool";
+				curOp.obj0.value=flagA || flagE;
+				break;
+			case Executable.sbID:
+				curOp.obj0.valType="bool";
+				curOp.obj0.value=flagB;
+				break;
+			case Executable.sbeID:
+				curOp.obj0.valType="bool";
+				curOp.obj0.value=flagB || flagE;
 				break;
 			case Executable.jaID:
 				if (flagA && !flagE) eip=curOp.obj0.value;
@@ -224,134 +466,11 @@ class Executable{
 			case Executable.jbID:
 				if (flagB && !flagE) eip=curOp.obj0.value;
 				break;
-			case Executable.movID:
-				curOp.obj0.value = curOp.obj1.value;
-				break;
-			case Executable.trendID:
-				if (!this.isGoodNumVal(curOp.obj2.value) || 
-					!this.isGoodNumVal(curOp.obj3.value) ||
-					!this.isGoodNumVal(curOp.obj4.value)) return this.hadError(curOp.codeLine, returnObject, "cannot figureTrend with nil value(s)");
-				curOp.obj1.value = curOp.obj0.figureTrend(curOp.obj2.value, curOp.obj3.value, curOp.obj4.value);
-				break;
-			case Executable.linearID:
-				if (!this.isGoodNumVal(curOp.obj2.value) || 
-					!this.isGoodNumVal(curOp.obj3.value)) return this.hadError(curOp.codeLine, returnObject, "cannot figureChart with nil value(s)");
-				curOp.obj1.value = curOp.obj0.figureChart(curOp.obj2.value, curOp.obj3.value);
-				break;
-			case Executable.polyID:
-				if (!this.isGoodNumVal(curOp.obj2.value) || 
-					!this.isGoodNumVal(curOp.obj3.value)) return this.hadError(curOp.codeLine, returnObject, "cannot figurePoly with nil value(s)");
-				curOp.obj1.value = curOp.obj0.figurePoly(curOp.obj2.value, curOp.obj3.value);
-				break;
-			case Executable.clampID:
-				if (!this.isGoodNumVal(curOp.obj2.value) || 
-					!this.isGoodNumVal(curOp.obj3.value)) return this.hadError(curOp.codeLine, returnObject, "cannot figureClamp with nil value(s)");
-				curOp.obj1.value = curOp.obj0.figureClamp(curOp.obj2.value, curOp.obj3.value);
-				break;
-			case Executable.notID:
-				if (Math.abs(curOp.obj0.value)>=0.5){
-					curOp.obj0.value=0;
-				}else{
-					curOp.obj0.value=1;
-				}
-				break;
-			case Executable.exponentID:
-				if (!this.isGoodNumVal(curOp.obj0.value) ||
-					!this.isGoodNumVal(curOp.obj1.value)) return this.hadError(curOp.codeLine, returnObject, "cannot operate on nil values");
-				curOp.obj0.value = curOp.obj0.value ** curOp.obj1.value;
-				break;
-			case Executable.mulID:
-				if (!this.isGoodNumVal(curOp.obj0.value) ||
-					!this.isGoodNumVal(curOp.obj1.value)) return this.hadError(curOp.codeLine, returnObject, "cannot operate on nil values");
-				curOp.obj0.value = curOp.obj0.value * curOp.obj1.value;
-				break;
-			case Executable.divID:
-				if (!this.isGoodNumVal(curOp.obj0.value) ||
-					!this.isGoodNumVal(curOp.obj1.value)) return this.hadError(curOp.codeLine, returnObject, "cannot operate on nil values");
-				curOp.obj0.value = curOp.obj0.value / curOp.obj1.value;
-				break;
-			case Executable.addID:
-				if (!this.isGoodNumVal(curOp.obj0.value) ||
-					!this.isGoodNumVal(curOp.obj1.value)) return this.hadError(curOp.codeLine, returnObject, "cannot operate on nil values");
-				curOp.obj0.value = curOp.obj0.value + curOp.obj1.value;
-				break;
-			case Executable.subID:
-				if (!this.isGoodNumVal(curOp.obj0.value) ||
-					!this.isGoodNumVal(curOp.obj1.value)) return this.hadError(curOp.codeLine, returnObject, "cannot operate on nil values");
-				curOp.obj0.value = curOp.obj0.value - curOp.obj1.value;
-				break;
-			case Executable.seID:
-				if (flagE){
-					curOp.obj0.value=1;
-				}else{
-					curOp.obj0.value=0;
-				}
-				break;
-			case Executable.sneID:
-				if (flagE){
-					curOp.obj0.value=0;
-				}else{
-					curOp.obj0.value=1;
-				}
-				break;
-			case Executable.saID:
-				if (flagA){
-					curOp.obj0.value=1;
-				}else{
-					curOp.obj0.value=0;
-				}
-				break;
-			case Executable.saeID:
-				if (flagA || flagE){
-					curOp.obj0.value=1;
-				}else{
-					curOp.obj0.value=0;
-				}
-				break;
-			case Executable.sbID:
-				if (flagB){
-					curOp.obj0.value=1;
-				}else{
-					curOp.obj0.value=0;
-				}
-				break;
-			case Executable.sbeID:
-				if (flagB || flagE){
-					curOp.obj0.value=1;
-				}else{
-					curOp.obj0.value=0;
-				}
-				break;
-			case Executable.andID:
-				if (!this.isGoodNumVal(curOp.obj0.value) || 
-					!this.isGoodNumVal(curOp.obj1.value)) return this.hadError(curOp.codeLine, returnObject, "cannot operate on nil values");
-				if (Math.abs(curOp.obj0.value)>=0.5 && Math.abs(curOp.obj1.value)>=0.5){
-					curOp.obj0.value=1;
-				}else{
-					curOp.obj0.value=0;
-				}
-				break;
-			case Executable.orID:
-				if (!this.isGoodNumVal(curOp.obj0.value) || 
-					!this.isGoodNumVal(curOp.obj1.value)) return this.hadError(curOp.codeLine, returnObject, "cannot operate on nil values");
-				if (Math.abs(curOp.obj0.value)>=0.5 || Math.abs(curOp.obj1.value)>=0.5){
-					curOp.obj0.value=1;
-				}else{
-					curOp.obj0.value=0;
-				}
-				break;
 			case Executable.jeID:
 				if (flagE) eip=curOp.obj0.value;
 				break;
 			case Executable.jneID:
 				if (!flagE) eip=curOp.obj0.value;
-				break;
-			case Executable.testID:
-				if (Math.abs(curOp.obj0.value)<0.5){
-					flagE=true;
-				}else{
-					flagE=false;
-				}
 				break;
 			case Executable.jmpID:
 				eip=curOp.obj0.value;
@@ -366,11 +485,8 @@ class Executable{
 				maxRunTime+=new Date().getTime()-msgStartTime;
 				break;
 			case Executable.isnilID:
-				if (curOp.obj1.value===null || curOp.obj1.value===undefined || curOp.obj1.value===NaN){
-					curOp.obj0.value=1;
-				}else{
-					curOp.obj0.value=0;
-				}
+				curOp.obj0.valType="bool";
+				curOp.obj0.value=!this.isGoodNumVal(curOp.obj1.value);
 			}
 		}
 
@@ -382,10 +498,10 @@ class Interpreter {
     constructor(owningChartObject, code){
 		this.program = new Executable();
 		this.owningChartObject=owningChartObject;
-		this.returnedValue={value: null};
-		this.eax={value: null};
-		this.ebx={value: null};
-		this.ecx={value: null};
+		this.returnedValue={value: null, valType:"num", name:"$returnVal"};
+		this.eax={value: null, valType:"num", name:"$eax", isRegister: true};
+		this.ebx={value: null, valType:"num", name:"$ebx", isRegister: true};
+		this.ecx={value: null, valType:"num", name:"$ecx", isRegister: true};
 		this.code=code;
     }
 
@@ -399,7 +515,7 @@ class Interpreter {
 
 		this.errorString="";
 		this.errorCodeLine=1;
-		this.errorWasDuring=ERROR_WAS_IN.COMPILE;
+		this.errorWasDuring="compile";
 
 		this.program.reset();
 		this.variables=[];
@@ -516,7 +632,11 @@ class Interpreter {
 		
         name=name.toLowerCase();
         if (name === "if") {
-            this.setToken(TokenType.If);
+			this.setToken(TokenType.If);
+		} else if (name === "floor"){
+            this.setToken(TokenType.FuncFloor);
+		} else if (name === "ceil"){
+            this.setToken(TokenType.FuncCeil);
         } else if (name === "min") {
             this.setToken(TokenType.FuncMin);
         } else if (name === "max") {
@@ -527,8 +647,8 @@ class Interpreter {
             this.setToken(TokenType.FuncAbs);
         } else if (name === "while") {
             this.setToken(TokenType.While);
-        } else if (name === "double") {
-            this.setToken(TokenType.Double);
+        } else if (name === "let") {
+            this.setToken(TokenType.Let);
         } else if (name === "return") {
             this.setToken(TokenType.Return);
         } else if (name === "else") {
@@ -597,6 +717,9 @@ class Interpreter {
 					if (!this.chartCall()) {
 						return false;
 					}
+					break;
+				case '%':
+					this.setToken(TokenType.Mod);
 					break;
 				case '{':
 					this.setToken(TokenType.LeftCurly);
@@ -716,7 +839,12 @@ class Interpreter {
 	}
 
 	isTermOp(){
-		if (this.token.type===TokenType.Multiply || this.token.type===TokenType.Divide) return true;
+		switch (this.token.type){
+		case TokenType.Multiply:
+		case TokenType.Divide:
+		case TokenType.Mod:
+			return true;
+		}
 		return false;
 	}
 
@@ -748,11 +876,28 @@ class Interpreter {
 		return false;
 	}
 
+	doCeil(){
+		if (!this.match(TokenType.FuncCeil)) return false;
+		if (!this.match(TokenType.LeftParen)) return false;
+		if (!this.doExpression()) return false;
+		this.program.newCeil(this.eax);
+		if (!this.match(TokenType.RightParen)) return false;
+		return true;
+	}
+	doFloor(){
+		if (!this.match(TokenType.FuncFloor)) return false;
+		if (!this.match(TokenType.LeftParen)) return false;
+		if (!this.doExpression()) return false;
+		this.program.newFloor(this.eax);
+		if (!this.match(TokenType.RightParen)) return false;
+		return true;
+	}
+
 	doAbs(){
-		let isPosBranch = this.newBranch();
+		let ifPosBranch = this.newBranch();
 		if (!this.match(TokenType.FuncAbs)) return false;
 		if (!this.match(TokenType.LeftParen)) return false;
-		if (!doExpression()) return false;
+		if (!this.doExpression()) return false;
 		this.program.newCmp(this.eax, 0);
 		this.program.newJA(ifPosBranch);
 		this.program.newNeg(this.eax);
@@ -917,10 +1062,10 @@ class Interpreter {
 			this.program.newNeg(this.eax);
 			return true;
 		case TokenType.True:
-			this.program.newMov(this.eax, 1);
+			this.program.newMov(this.eax, {value: true, valType:"bool", name:"true"});
 			return this.match(TokenType.True);
 		case TokenType.False:
-			this.program.newMov(this.eax, 0);
+			this.program.newMov(this.eax, {value: false, valType:"bool", name:"false"});
 			return this.match(TokenType.False);
 		case TokenType.Not:
 			if (!this.match(TokenType.Not)) return false;
@@ -937,6 +1082,10 @@ class Interpreter {
 			return this.doMin();
 		case TokenType.FuncMax:
 			return this.doMax();
+		case TokenType.FuncFloor:
+			return this.doFloor();
+		case TokenType.FuncCeil:
+			return this.doCeil();
 		}
 		return this.setError("Expected factor but found "+this.token.type+":"+this.token.value);
 	}
@@ -975,6 +1124,13 @@ class Interpreter {
 				this.program.newMov(this.ebx, this.eax);
 				this.program.newPop(this.eax);
 				this.program.newDiv(this.eax, this.ebx);
+				break;
+			case TokenType.Mod:
+				if (!this.match(TokenType.Mod)) return false;
+				if (!this.doPower()) return false;
+				this.program.newMov(this.ebx, this.eax);
+				this.program.newPop(this.eax);
+				this.program.newMod(this.eax, this.ebx);
 				break;
 			}
 		}
@@ -1125,8 +1281,8 @@ class Interpreter {
 		return this.match(TokenType.LineDelim);
 	}
 
-	doDouble(){
-		if (!this.match(TokenType.Double)) return false;
+	doLet(){
+		if (!this.match(TokenType.Let)) return false;
 		if (this.token.type!==TokenType.Ident) return this.setError("Expected identifier but found "+this.token.value);
 		let notDone=true;
 		while (notDone){
@@ -1177,8 +1333,8 @@ class Interpreter {
 			case TokenType.Return:
 				if (!this.doReturn()) return false;
 				break;
-			case TokenType.Double:
-				if (!this.doDouble()) return false;
+			case TokenType.Let:
+				if (!this.doLet()) return false;
 				break;
 			case TokenType.MsgBox:
 				if (!this.match(TokenType.MsgBox)) return false;
@@ -1257,8 +1413,9 @@ class Interpreter {
 		this.chartObjectArray=Array.isArray(chartObjectArray) ? chartObjectArray : [];
 		if (this.next()){
 			if (!this.doBlock(null, false)) return false;
-			this.errorWasDuring=ERROR_WAS_IN.LINKING;
+			this.errorWasDuring="linking";
 			if (!this.program.link()) return this.setError("Linking failed");
+			this.errorWasDuring="execution";
 			return true;
 		}
 		return false;
@@ -1270,10 +1427,12 @@ class Interpreter {
 		this.returnedValue.value=initialThisValue;
 
 		if (!this.program.execute(this.returnedValue, console.log, timeoutTime)){
-			this.errorWasDuring=ERROR_WAS_IN.EXECUTION;
+			this.errorWasDuring="execution";
 			this.setError(this.program.errorString);
 			return null;
 		}
+		if (this.returnedValue.value===true) return 1;
+		if (this.returnedValue.value===false) return 0;
 		return this.returnedValue.value;
 	}
 }
