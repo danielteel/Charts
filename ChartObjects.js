@@ -228,7 +228,7 @@ class ChartObject {
 }
 
 class LinearChart extends ChartObject {
-    constructor(name="", yIsInputAxis=false, xOrYRefObj=null, zRefObj=null, lines=null){
+    constructor(name="", yIsInputAxis=false, xOrYRefObj=null, zRefObj=null, ...lines){
         super(name, "linear", null);
 
         this.yIsInputAxis=yIsInputAxis;
@@ -343,7 +343,7 @@ class ClampChart extends ChartObject {
 }
 
 class TrendChart extends ChartObject{
-    constructor(name="", yIsInputAxis=false, xOrYRefObj=null, entryPointRefObj=null, exitPointRefObj=null, lines=null){
+    constructor(name="", yIsInputAxis=false, xOrYRefObj=null, entryPointRefObj=null, exitPointRefObj=null, ...lines){
         super(name, "trend", null);
 
         this.yIsInputAxis=yIsInputAxis;
@@ -366,7 +366,7 @@ class TrendChart extends ChartObject{
         if (isAnyNil(this.xOrYRefObj, this.entryPointRefObj, this.exitPointRefObj)){
             this.value=null;
         }else{
-            this.value=this.figureTrend(this.xOrYRefObj, this.entryPointRefObj, this.exitPointRefObj);
+            this.value=this.figureTrend(this.xOrYRefObj.value, this.entryPointRefObj.value, this.exitPointRefObj.value);
         }
     }
 
@@ -422,7 +422,7 @@ class TrendChart extends ChartObject{
 }
 
 class PolyChart extends ChartObject{
-    constructor(name="", xInRefObj=null, yInRefObj=null, lines=null){
+    constructor(name="", xInRefObj=null, yInRefObj=null, ...lines){
         super(name, "poly", null);
 
         this.xInRefObj=xInRefObj;
@@ -430,9 +430,6 @@ class PolyChart extends ChartObject{
 
         if (Array.isArray(lines)){
             this.lines=lines.map( line => {return new Line(line);} );
-            if (!yIsInputAxis){
-                this.lines.forEach( line => {line.flipPoints();} )//we flip the points when yIsInputAxis==false for trendcharts
-            }
         }else{
             this.lines=[];
         }
@@ -500,7 +497,7 @@ class ChartTableEntry {
 }
 
 class ChartTable extends ChartObject {
-    constructor(name="", inputRefObj=null, table=null){
+    constructor(name="", inputRefObj=null, ...table){
         super(name, "table", null);
 
         this.inputRefObj=inputRefObj;
@@ -577,6 +574,9 @@ class ChartScript extends ChartObject {
 
     calc(chartObjectArray){
         this.value = this.interpreter.run(chartObjectArray, null);
+        if (this.interpreter.errorHappened){
+            console.log(this.name, " error during script execution, ",this.interpreter.getErrorMessage);
+        }
     }
 }
 
@@ -585,6 +585,14 @@ class ChartConstant extends ChartObject {
         super(name, "constant", value);
     }
 }
+
+function P(x,y){
+    return new Point(x,y);
+}
+function L(val,...points){
+    return new Line(points, val);
+}
+
 
 module.exports={Point: Point, 
                 Line: Line,

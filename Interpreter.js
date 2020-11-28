@@ -6,7 +6,7 @@ const TokenType =  {
     While:"while",If:"if",LeftCurly:"{",RightCurly:"}",Return:"return",Else:"else",
     Break:"break",LineDelim:";",Not:"!",And:"&&",Or:"||",Comma:",",Let:"let",
     True:"true",False:"false",Nil:"nil",ChartCall:"@",This:"this",String:"string",
-    MsgBox:"msgbox", Mod:"%", FuncFloor:"floor", FuncCeil:"ceil"
+    MsgBox:"msgbox", Mod:"%", FuncFloor:"floor", FuncCeil:"ceiling"
 };
 
 
@@ -104,10 +104,10 @@ class Executable{
 	newJA(jumpToThisBranchId){ this._opCodes.push(Executable.newOp(Executable.jaID, this.currentCodeLine, "ja", jumpToThisBranchId));}
 	newJB(jumpToThisBranchId){ this._opCodes.push(Executable.newOp(Executable.jbID, this.currentCodeLine, "jb", jumpToThisBranchId)); }
 	newMov(recvObj, sendObj){ this._opCodes.push(Executable.newOp(Executable.movID, this.currentCodeLine, "mov", recvObj, sendObj)); }
-	newTrendCall(chart, returnObj, objA, objB, objC){ this._opCodes.push(Executable.newOp(Executable.trendID, this.currentCodeLine, "trend", returnObj, objA, objB, objC)); }
-	newLinearCall(chart, returnObj, objA, objB){ this._opCodes.push(Executable.newOp(Executable.linearID, this.currentCodeLine, "linear", returnObj, objA, objB)); }
-	newPolyCall(chart, returnObj, objA, objB){ this._opCodes.push(Executable.newOp(Executable.polyID, this.currentCodeLine, "poly", returnObj, objA, objB)); }
-	newClampCall(chart, returnObj, objA, objB){ this._opCodes.push(Executable.newOp(Executable.clampID, this.currentCodeLine, "clamp", returnObj, objA, objB)); }
+	newTrendCall(chart, returnObj, objA, objB, objC){ this._opCodes.push(Executable.newOp(Executable.trendID, this.currentCodeLine, "trend", chart, returnObj, objA, objB, objC)); }
+	newLinearCall(chart, returnObj, objA, objB){ this._opCodes.push(Executable.newOp(Executable.linearID, this.currentCodeLine, "linear", chart, returnObj, objA, objB)); }
+	newPolyCall(chart, returnObj, objA, objB){ this._opCodes.push(Executable.newOp(Executable.polyID, this.currentCodeLine, "poly", chart, returnObj, objA, objB)); }
+	newClampCall(chart, returnObj, objA, objB){ this._opCodes.push(Executable.newOp(Executable.clampID, this.currentCodeLine, "clamp", chart, returnObj, objA, objB)); }
 	newNot(objToNot){ this._opCodes.push(Executable.newOp(Executable.notID, this.currentCodeLine, "not", objToNot)); }
 	newExponent(recvObj, exponentObj){ this._opCodes.push(Executable.newOp(Executable.exponentID, this.currentCodeLine, "pow", recvObj, exponentObj)); }
 	newMul(recvObj, multiplyByObj){ this._opCodes.push(Executable.newOp(Executable.mulID, this.currentCodeLine, "mul", recvObj, multiplyByObj)); }
@@ -513,6 +513,7 @@ class Interpreter {
         this.look=this._code[0];
 		this.codeEndIndex=this._code.length;
 
+		this.errorHappened=false;
 		this.errorString="";
 		this.errorCodeLine=1;
 		this.errorWasDuring="compile";
@@ -528,6 +529,7 @@ class Interpreter {
     getErrorLine(){ return this.errorCodeLine;}
 
 	setError(msg){
+		this.errorHappened=true;
 		this.errorString=msg;
 		return false
 	}
@@ -635,7 +637,7 @@ class Interpreter {
 			this.setToken(TokenType.If);
 		} else if (name === "floor"){
             this.setToken(TokenType.FuncFloor);
-		} else if (name === "ceil"){
+		} else if (name === "ceiling"){
             this.setToken(TokenType.FuncCeil);
         } else if (name === "min") {
             this.setToken(TokenType.FuncMin);
@@ -647,7 +649,7 @@ class Interpreter {
             this.setToken(TokenType.FuncAbs);
         } else if (name === "while") {
             this.setToken(TokenType.While);
-        } else if (name === "let") {
+        } else if (name === "double") {
             this.setToken(TokenType.Let);
         } else if (name === "return") {
             this.setToken(TokenType.Return);
@@ -1422,7 +1424,10 @@ class Interpreter {
 	}
 
 	run(chartObjectArray, initialThisValue, timeoutTime=5000){
-		if (!this.compile(chartObjectArray)) return null;
+		this.errorHappened=false;
+		if (!this.compile(chartObjectArray)){
+			return null;
+		}
 
 		this.returnedValue.value=initialThisValue;
 
