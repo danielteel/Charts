@@ -5,13 +5,38 @@ const OpObjType={
     register: Symbol("register")
 };
 
-class Helpers{
+class Utils{
     static isAboutEquals(a,b){
         if (Math.abs(a-b)<0.000001){
             return true;
         }
         return false;
     }
+
+    static isDigit(character){
+        const charCode=character.charCodeAt(0);
+        if (charCode>=48 && charCode<=57){
+            return true;
+        }
+        return false;
+    }
+
+    static isAlpha(character){
+        const charCode=character.charCodeAt(0);
+        if ((charCode>=65 && charCode<=90) || (charCode>=97 && charCode<=122)){
+            return true;
+        }
+        return false;
+    }
+    
+    static isAlNum(character){
+        return Utils.isAlpha(character) || Utils.isDigit(character);
+    }
+	
+	static isSpace(character){
+		if (character.charCodeAt(0)<=32) return true;
+		return false
+	}
 }
 
 class OpObj {
@@ -80,7 +105,7 @@ class BoolObj extends OpObj {
         case OpObjType.bool:
             return this._value===obj._value;
         case OpObjType.num:
-            return Helpers.isAboutEquals(Number(this._value), obj._value);
+            return Utils.isAboutEquals(Number(this._value), obj._value);
         default:
             throw new Error("Tried to do comparison to invalid type");
         }
@@ -151,7 +176,7 @@ class NumberObj extends OpObj {
         case OpObjType.bool:
             return this._value===Number(obj._value);
         case OpObjType.num:
-            return Helpers.isAboutEquals(this._value, obj._value);
+            return Utils.isAboutEquals(this._value, obj._value);
         default:
             throw new Error("Tried to do comparison to invalid type");
         }
