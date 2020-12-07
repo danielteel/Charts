@@ -1,3 +1,5 @@
+const Utils = require('./Utils');
+
 const OpObjType={
     bool: Symbol("bool"),
     num: Symbol("number"),
@@ -5,39 +7,6 @@ const OpObjType={
     register: Symbol("register")
 };
 
-class Utils{
-    static isAboutEquals(a,b){
-        if (Math.abs(a-b)<0.000001){
-            return true;
-        }
-        return false;
-    }
-
-    static isDigit(character){
-        const charCode=character.charCodeAt(0);
-        if (charCode>=48 && charCode<=57){
-            return true;
-        }
-        return false;
-    }
-
-    static isAlpha(character){
-        const charCode=character.charCodeAt(0);
-        if ((charCode>=65 && charCode<=90) || (charCode>=97 && charCode<=122)){
-            return true;
-        }
-        return false;
-    }
-    
-    static isAlNum(character){
-        return Utils.isAlpha(character) || Utils.isDigit(character);
-    }
-	
-	static isSpace(character){
-		if (character.charCodeAt(0)<=32) return true;
-		return false
-	}
-}
 
 class OpObj {
     constructor(name="", objType=null, value=null, isConstant=false){
@@ -54,6 +23,14 @@ class OpObj {
     get objType(){
         return this._objType;
     }
+
+    get isConstant(){
+        return this._isConstant;
+    }
+
+    get value(){
+        return this._value;
+    }
 }
 
 class RegisterObj extends OpObj {
@@ -65,12 +42,42 @@ class RegisterObj extends OpObj {
     setTo(obj){
         if (obj instanceof OpObj === false) throw new Error("Tried to set register to invalid type");
 
-        if (obj.objType===OpObjType.register){
+        if (obj._objType===OpObjType.register){
             this._curValType=obj._curValType;
         }else{
-            this._curValType=obj.objType;
+            this._curValType=obj._objType;
         }
         this._value=obj._value;
+    }
+
+    getNativeObj(){
+        switch (this._curValType){
+        case OpObjType.string:
+            return new StringObj("",this._value, true);
+        case OpObjType.bool:
+            return new BoolObj("", this._value, true);
+        case OpObjType.num:
+            return new NumberObj("", this._value, true);
+        }
+    }
+
+    eqaulTo(obj){
+        return this.getNativeObj().eqaulTo(obj);
+    }
+    notEqualTo(obj){
+        return this.getNativeObj().notEqualTo(obj);
+    }
+    smallerThan(obj){
+        return this.getNativeObj().smallerThan(obj);
+    }
+    greaterThan(obj){
+        return this.getNativeObj().greaterThan(obj);
+    }
+    smallerOrEqualThan(obj){
+        return this.getNativeObj().smallerOrEqualThan(obj);
+    }
+    greaterOrEqualThan(obj){
+        return this.getNativeObj().greaterOrEqualThan(obj);
     }
 }
 
@@ -83,7 +90,7 @@ class BoolObj extends OpObj {
         if (this._isConstant)  throw new Error("Tried to write to constant bool");
         if (obj instanceof OpObj === false) throw new Error("Tried to set bool to invalid type");
         
-        let type=obj.objType;
+        let type=obj._objType;
         if (type===OpObjType.register) type=obj._curValType;
 
         switch (type){
@@ -91,14 +98,14 @@ class BoolObj extends OpObj {
             this._value=obj._value;
             break;
         case OpObjType.num:
-            this._value=!!obj._value;
+            this._value=Boolean(obj._value);
             break;
         default:
             throw new Error("Tried to set bool to unknown type");
         }
     }
     eqaulTo(obj){
-        let type=obj.objType;
+        let type=obj._objType;
         if (type===OpObjType.register) type=obj._curValType;
 
         switch (type){
@@ -114,7 +121,7 @@ class BoolObj extends OpObj {
         return !this.eqaulTo(obj);
     }
     smallerThan(obj){
-        let type=obj.objType;
+        let type=obj._objType;
         if (type===OpObjType.register) type=obj._curValType;
         switch (type){
         case OpObjType.bool:
@@ -126,7 +133,7 @@ class BoolObj extends OpObj {
         }
     }
     greaterThan(obj){
-        let type=obj.objType;
+        let type=obj._objType;
         if (type===OpObjType.register) type=obj._curValType;
         switch (type){
         case OpObjType.bool:
@@ -154,7 +161,7 @@ class NumberObj extends OpObj {
         if (this._isConstant)  throw new Error("Tried to write to constant number");
         if (obj instanceof OpObj === false) throw new Error("Tried to set number to invalid type");
         
-        let type=obj.objType;
+        let type=obj._objType;
         if (type===OpObjType.register) type=obj._curValType;
 
         switch (type){
@@ -169,7 +176,7 @@ class NumberObj extends OpObj {
         }
     }
     eqaulTo(obj){
-        let type=obj.objType;
+        let type=obj._objType;
         if (type===OpObjType.register) type=obj._curValType;
 
         switch (type){
@@ -185,7 +192,7 @@ class NumberObj extends OpObj {
         return !this.eqaulTo(obj);
     }
     smallerThan(obj){
-        let type=obj.objType;
+        let type=obj._objType;
         if (type===OpObjType.register) type=obj._curValType;
         switch (type){
         case OpObjType.bool:
@@ -197,7 +204,7 @@ class NumberObj extends OpObj {
         }
     }
     greaterThan(obj){
-        let type=obj.objType;
+        let type=obj._objType;
         if (type===OpObjType.register) type=obj._curValType;
         switch (type){
         case OpObjType.bool:
@@ -225,7 +232,7 @@ class StringObj extends OpObj {
         if (this._isConstant)  throw new Error("Tried to write to constant string");
         if (obj instanceof OpObj === false) throw new Error("Tried to set string to invalid type");
         
-        let type=obj.objType;
+        let type=obj._objType;
         if (type===OpObjType.register) type=obj._curValType;
 
         switch (type){
@@ -238,7 +245,7 @@ class StringObj extends OpObj {
     }
 
     eqaulTo(obj){
-        let type=obj.objType;
+        let type=obj._objType;
         if (type===OpObjType.register) type=obj._curValType;
 
         switch (type){
@@ -265,7 +272,11 @@ class StringObj extends OpObj {
     }
 }
 
-let a=new NumberObj("a", .5);
-let b=new BoolObj("b", true);
 
-console.log(a.eqaulTo(b));
+class Machine {
+    constructor(){
+
+    }
+}
+
+module.exports={OpObjType, OpObj, RegisterObj, StringObj, NumberObj, BoolObj, Machine};

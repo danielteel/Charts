@@ -563,6 +563,9 @@ class ChartInput extends ChartObject {
 
     calc(chartObjectArray){
         this.value = this.interpreter.run(chartObjectArray, this.value);
+        if (this.interpreter.errorHappened){
+            console.log(this.name, " error during script execution, ",this.interpreter.getErrorMessage());
+        }
     }
 }
 
@@ -575,7 +578,7 @@ class ChartScript extends ChartObject {
     calc(chartObjectArray){
         this.value = this.interpreter.run(chartObjectArray, null);
         if (this.interpreter.errorHappened){
-            console.log(this.name, " error during script execution, ",this.interpreter.getErrorMessage);
+            console.log(this.name, " error during script execution, ",this.interpreter.getErrorMessage());
         }
     }
 }
