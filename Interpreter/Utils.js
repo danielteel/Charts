@@ -23,7 +23,7 @@ class Utils{
     }
     
     static isAlNum(character){
-        return Utils.isAlpha(character) || Utils.isDigit(character);
+	    return Utils.isAlpha(character) || Utils.isDigit(character);
     }
 	 
 	static isSpace(character){

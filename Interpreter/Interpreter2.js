@@ -4,7 +4,7 @@ const Tokenizer = require('./Tokenizer');
 
 class Interpreter {
     constructor(code){
-        this.tokenizer=new Tokenizer(code);
+	    this.tokenizer=new Tokenizer(code);
     }
 
     runCode(code){

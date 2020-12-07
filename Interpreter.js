@@ -12,7 +12,7 @@ const TokenType =  {
 
 function isAnyNil(...vals){
     for (let a of vals){
-        if (a===null || a===undefined) return true;
+	if (a===null || a===undefined) return true;
     }
     return false;
 }
@@ -21,7 +21,7 @@ function isAboutEquals(a, b, allowableDelta=0.00001){
     if (isAnyNil(a,b)) return false;
 
     if (Math.abs(a-b)<=allowableDelta){
-        return true;
+	return true;
     }
     return false;
 }
@@ -509,8 +509,8 @@ class Interpreter {
 		this._code=value;
 
 		this.token={type: null, value: null};
-        this.lookIndex=0;
-        this.look=this._code[0];
+	this.lookIndex=0;
+	this.look=this._code[0];
 		this.codeEndIndex=this._code.length;
 
 		this.errorHappened=false;
@@ -535,18 +535,18 @@ class Interpreter {
 	}
 
     setToken(type, value=null){
-        this.token.type=type;
-        this.token.value=value;
+	this.token.type=type;
+	this.token.value=value;
     }
 
     isDigit(character){
-        if ("0123456789".indexOf(character)>=0) return true;//TODO make more efficient
-        return false;
+	if ("0123456789".indexOf(character)>=0) return true;//TODO make more efficient
+	return false;
     }
 
     isAlpha(character){
-        if ("abcdefghijklmnopqrstuvwxyz".indexOf(character.toLowerCase())>=0) return true;//TODO make more efficient
-        return false;
+	if ("abcdefghijklmnopqrstuvwxyz".indexOf(character.toLowerCase())>=0) return true;//TODO make more efficient
+	return false;
 	}
 	
 	isSpace(character){
@@ -555,14 +555,14 @@ class Interpreter {
 	}
 
     isNotEnd(){
-        return this.lookIndex<this.codeEndIndex;
+	return this.lookIndex<this.codeEndIndex;
     }
 
     getChar(){
-        if (this.isNotEnd()){
-            this.lookIndex++;
-            this.look=this._code[this.lookIndex];
-        }
+	if (this.isNotEnd()){
+	    this.lookIndex++;
+	    this.look=this._code[this.lookIndex];
+	}
 	}
 	
 	skipWhite(){
@@ -579,100 +579,100 @@ class Interpreter {
     ////////      Tokenizer      ////////
     /////////////////////////////////////
     number(){
-        let hasDec=false;
-        let notDone=true;
-        let num="";
-        while (this.isNotEnd() && notDone===true){
-            notDone = false;
-            if (this.isDigit(this.look)) {
-                num += this.look;
-                notDone = true;
-            }
-            if (this.look === '.' && hasDec === false) {
-                hasDec = true;
-                num += this.look;
-                notDone = true;
-            }
-            if (notDone===true) this.getChar();
-        }
-        
-        if (num.length < 2 && hasDec === true) return this.setError("Expected number but found lone decimal.");
+	let hasDec=false;
+	let notDone=true;
+	let num="";
+	while (this.isNotEnd() && notDone===true){
+	    notDone = false;
+	    if (this.isDigit(this.look)) {
+		num += this.look;
+		notDone = true;
+	    }
+	    if (this.look === '.' && hasDec === false) {
+		hasDec = true;
+		num += this.look;
+		notDone = true;
+	    }
+	    if (notDone===true) this.getChar();
+	}
+	
+	if (num.length < 2 && hasDec === true) return this.setError("Expected number but found lone decimal.");
     
 
-        this.setToken(TokenType.Constant,Number(num));
-        return true;
+	this.setToken(TokenType.Constant,Number(num));
+	return true;
     }
 
     stringToken(){
-        let str="";
-        this.getChar();
-        while (this.isNotEnd() && this.look!=='"') {
-            str += this.look;
-            this.getChar();
-        }
-        if (this.isNotEnd()){
-            if (this.look !== '"') return this.setError("Expected string but found end of code.");
-        }
-        this.getChar();
-        this.setToken(TokenType.String, str);
-        return true;
+	let str="";
+	this.getChar();
+	while (this.isNotEnd() && this.look!=='"') {
+	    str += this.look;
+	    this.getChar();
+	}
+	if (this.isNotEnd()){
+	    if (this.look !== '"') return this.setError("Expected string but found end of code.");
+	}
+	this.getChar();
+	this.setToken(TokenType.String, str);
+	return true;
     }
 
     ident(){
-        let name="";
-        let notDone = true;
-        while (this.isNotEnd() && notDone===true) {
-            notDone = false;
-            if (this.isAlpha(this.look) || this.isDigit(this.look) || this.look === '_' || this.look === '.') {
-                name += this.look;
-                notDone = true;
-                this.getChar();
-            }
+	let name="";
+	let notDone = true;
+	while (this.isNotEnd() && notDone===true) {
+	    notDone = false;
+	    if (this.isAlpha(this.look) || this.isDigit(this.look) || this.look === '_' || this.look === '.') {
+		name += this.look;
+		notDone = true;
+		this.getChar();
+	    }
 		}
 		
 		if (name.length === 0) return this.setError("Expected identifier but got nothing");
 		
-        name=name.toLowerCase();
-        if (name === "if") {
+	name=name.toLowerCase();
+	if (name === "if") {
 			this.setToken(TokenType.If);
 		} else if (name === "floor"){
-            this.setToken(TokenType.FuncFloor);
+	    this.setToken(TokenType.FuncFloor);
 		} else if (name === "ceiling"){
-            this.setToken(TokenType.FuncCeil);
-        } else if (name === "min") {
-            this.setToken(TokenType.FuncMin);
-        } else if (name === "max") {
-            this.setToken(TokenType.FuncMax);
-        } else if (name === "clamp") {
-            this.setToken(TokenType.FuncClamp);
-        } else if (name === "abs") {
-            this.setToken(TokenType.FuncAbs);
-        } else if (name === "while") {
-            this.setToken(TokenType.While);
-        } else if (name === "double") {
-            this.setToken(TokenType.Let);
-        } else if (name === "return") {
-            this.setToken(TokenType.Return);
-        } else if (name === "else") {
-            this.setToken(TokenType.Else);
-        } else if (name === "break") {
-            this.setToken(TokenType.Break);
-        } else if (name === "isnil") {
-            this.setToken(TokenType.FuncBoolIsNil);
-        } else if (name === "true") {
-            this.setToken(TokenType.True);
-        } else if (name === "false") {
-            this.setToken(TokenType.False);
-        }else if (name==="nil"){
-            this.setToken(TokenType.Nil);
-        } else if (name === "this") {
-            this.setToken(TokenType.This);
-        } else if (name === "msgbox") {
-            this.setToken(TokenType.MsgBox);
-        } else {
-            this.setToken(TokenType.Ident, name);
-        }
-        return true;
+	    this.setToken(TokenType.FuncCeil);
+	} else if (name === "min") {
+	    this.setToken(TokenType.FuncMin);
+	} else if (name === "max") {
+	    this.setToken(TokenType.FuncMax);
+	} else if (name === "clamp") {
+	    this.setToken(TokenType.FuncClamp);
+	} else if (name === "abs") {
+	    this.setToken(TokenType.FuncAbs);
+	} else if (name === "while") {
+	    this.setToken(TokenType.While);
+	} else if (name === "double") {
+	    this.setToken(TokenType.Let);
+	} else if (name === "return") {
+	    this.setToken(TokenType.Return);
+	} else if (name === "else") {
+	    this.setToken(TokenType.Else);
+	} else if (name === "break") {
+	    this.setToken(TokenType.Break);
+	} else if (name === "isnil") {
+	    this.setToken(TokenType.FuncBoolIsNil);
+	} else if (name === "true") {
+	    this.setToken(TokenType.True);
+	} else if (name === "false") {
+	    this.setToken(TokenType.False);
+	}else if (name==="nil"){
+	    this.setToken(TokenType.Nil);
+	} else if (name === "this") {
+	    this.setToken(TokenType.This);
+	} else if (name === "msgbox") {
+	    this.setToken(TokenType.MsgBox);
+	} else {
+	    this.setToken(TokenType.Ident, name);
+	}
+	return true;
 	}
 	
 	
