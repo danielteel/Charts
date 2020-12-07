@@ -131,8 +131,8 @@ class Tokenizer {
                 notDone = true;
             }
             if (this.look === '.' && hasDec === false) {
-                hasDec = true;
                 num += this.look;
+                hasDec = true;
                 notDone = true;
             }
             if (notDone===true) this.getChar();
@@ -318,8 +318,4 @@ class Tokenizer {
 	}
 
 }
-
-let a=new Tokenizer('double age=0;\nstring name="Dan";\nbool isDone=~;');
-console.log(a.tokenize());
-console.log(a.tokens);
 module.exports=Tokenizer;
