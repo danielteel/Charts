@@ -165,14 +165,14 @@ class NumberObj extends OpObj {
 		if (type===OpObjType.register) type=obj._curValType;
 
 		switch (type){
-		case OpObjType.bool:
-			this._value=Number(obj._value);
-			break;
-		case OpObjType.num:
-			this._value=obj._value;
-			break;
-		default:
-			throw new Error("Tried to set number to invalid type");
+			case OpObjType.bool:
+				this._value=Number(obj._value);
+				break;
+			case OpObjType.num:
+				this._value=obj._value;
+				break;
+			default:
+				throw new Error("Tried to set number to invalid type");
 		}
     }
     eqaulTo(obj){
@@ -180,12 +180,12 @@ class NumberObj extends OpObj {
 		if (type===OpObjType.register) type=obj._curValType;
 
 		switch (type){
-		case OpObjType.bool:
-			return this._value===Number(obj._value);
-		case OpObjType.num:
-			return Utils.isAboutEquals(this._value, obj._value);
-		default:
-			throw new Error("Tried to do comparison to invalid type");
+			case OpObjType.bool:
+				return this._value===Number(obj._value);
+			case OpObjType.num:
+				return Utils.isAboutEquals(this._value, obj._value);
+			default:
+				throw new Error("Tried to do comparison to invalid type");
 		}
     }    
     notEqualTo(obj){
@@ -195,24 +195,24 @@ class NumberObj extends OpObj {
 		let type=obj._objType;
 		if (type===OpObjType.register) type=obj._curValType;
 		switch (type){
-		case OpObjType.bool:
-			return this._value<Number(obj._value);
-		case OpObjType.num:
-			return this._value<obj._value;
-		default:
-			throw new Error("Tried to do comparison to invalid type");
+			case OpObjType.bool:
+				return this._value<Number(obj._value);
+			case OpObjType.num:
+				return this._value<obj._value;
+			default:
+				throw new Error("Tried to do comparison to invalid type");
 		}
     }
     greaterThan(obj){
 		let type=obj._objType;
 		if (type===OpObjType.register) type=obj._curValType;
 		switch (type){
-		case OpObjType.bool:
-			return this._value>Number(obj._value);
-		case OpObjType.num:
-			return this._value>obj._value;
-		default:
-			throw new Error("Tried to do comparison to invalid type");
+			case OpObjType.bool:
+				return this._value>Number(obj._value);
+			case OpObjType.num:
+				return this._value>obj._value;
+			default:
+				throw new Error("Tried to do comparison to invalid type");
 		}
     }
     smallerOrEqualThan(obj){
@@ -236,11 +236,11 @@ class StringObj extends OpObj {
 		if (type===OpObjType.register) type=obj._curValType;
 
 		switch (type){
-		case OpObjType.string:
-			this._value=obj._value;
-			break;
-		default:
-			throw new Error("Tried to set string to invalid type");
+			case OpObjType.string:
+				this._value=obj._value;
+				break;
+			default:
+				throw new Error("Tried to set string to invalid type");
 		}
     }
 
@@ -249,10 +249,10 @@ class StringObj extends OpObj {
 		if (type===OpObjType.register) type=obj._curValType;
 
 		switch (type){
-		case OpObjType.string:
-			return this._value===obj._value;
-		default:
-			throw new Error("Tried to do comparison to invalid type");
+			case OpObjType.string:
+				return this._value===obj._value;
+			default:
+				throw new Error("Tried to do comparison to invalid type");
 		}
     }    
     notEqualTo(obj){

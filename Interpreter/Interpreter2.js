@@ -1,16 +1,29 @@
 const Utils = require('./Utils');
 const {OpObjType, OpObj, RegisterObj, StringObj, NumberObj, BoolObj, Machine}=require('./Machine');
+
 const Tokenizer = require('./Tokenizer');
+const Parser = require('./Parser');
+
 
 class Interpreter {
-    constructor(code){
-	    this.tokenizer=new Tokenizer(code);
+    constructor(){
     }
 
     runCode(code){
-        let errorRecvd=this.tokenizer.tokenize();
+        
+        let tokenizer=new Tokenizer(code);
+        let errorRecvd=tokenizer.tokenize();
+
         if (errorRecvd!==null){
             console.log("Error during tokenization on line: "+errorRecvd.line+" "+errorRecvd.message);
+            return errorRecvd;
+        }
+
+        let parser=new Parser(tokenizer.tokens);
+        errorRecvd=parser.parse();
+
+        if (errorRecvd!==null){
+            console.log("Error during parse on line: "+errorRecvd.line+" "+errorRecvd.message);
             return errorRecvd;
         }
 
@@ -20,8 +33,7 @@ class Interpreter {
 
 
 
-let a=new Interpreter("double DOUBLE=0;\nstring name='Dan';\nbool isDone=;");
-console.log(a.runCode());
-console.log(a.tokenizer.tokens);
+let a=new Interpreter();
+console.log(a.runCode("function addBoth(double a, double b) double {\n\treturn a+b;\n}\n\n;exit addBoth(1,2);"));
 
 module.exports=Interpreter;

@@ -1,4 +1,4 @@
-let Utils = require("./Utils");
+const Utils = require("./Utils");
 
 const TokenType = {
     LineDelim: Symbol(";"),
@@ -19,6 +19,9 @@ const TokenType = {
 
     LeftParen: Symbol("("),
     RightParen: Symbol(")"),
+    LeftSqaure: Symbol("["),
+    RightSqaure: Symbol("]"),
+
     Comma: Symbol(","),
 
     Not: Symbol("!"),
@@ -46,6 +49,8 @@ const TokenType = {
     Floor: Symbol("floor"),
     Ceil: Symbol("ceiling"),
 
+    Function: Symbol("function"),
+
     While: Symbol("while"),
     For: Symbol("for"),
     Loop: Symbol("loop"),
@@ -56,13 +61,18 @@ const TokenType = {
     RightCurly: Symbol("}"),
 
     Return: Symbol("return"),
-    This: Symbol("this")
+    This: Symbol("this"),
+    Exit: Symbol("exit")
 };
 
 
 class Tokenizer {
-    static newTokenObj(type, value) {
-        return {type: type, value: value};
+    static newTokenObj(type, value, line) {
+        return {type: type, value: value, line: line};
+    }
+
+    static get TokenType(){
+        return TokenType;
     }
 
     constructor(code) {
@@ -96,7 +106,7 @@ class Tokenizer {
     }
 
     addToken(type, value = null) {
-        this.tokens.push(Tokenizer.newTokenObj(type, value));
+        this.tokens.push(Tokenizer.newTokenObj(type, value, this.currentCodeLine));
         return true;
     }
 
@@ -106,7 +116,7 @@ class Tokenizer {
 
     getChar() {
         if (this.isNotEnd()) {
-            this.lookIndex ++;
+            this.lookIndex++;
             this.look = this.code[this.lookIndex];
         }
     }
@@ -187,8 +197,13 @@ class Tokenizer {
             case "break":
                 return this.addToken(TokenType.Break);
 
+            case "function":
+                return this.addToken(TokenType.Function);
             case "return":
                 return this.addToken(TokenType.Return);
+
+            case "exit":
+                return this.addToken(TokenType.Exit);
 
             case "floor":
                 return this.addToken(TokenType.Floor);
@@ -246,6 +261,11 @@ class Tokenizer {
                         return this.addToken(TokenType.LeftCurly);
                     case '}':
                         return this.addToken(TokenType.RightCurly);
+
+                    case '[':
+                        return this.addToken(TokenType.LeftSqaure);
+                    case ']':
+                        return this.addToken(TokenType.RightSqaure);
 
                     case '(':
                         return this.addToken(TokenType.LeftParen);
