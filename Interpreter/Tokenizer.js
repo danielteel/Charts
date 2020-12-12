@@ -197,10 +197,10 @@ class Tokenizer {
             case "break":
                 return this.addToken(TokenType.Break);
 
-            case "function":
-                return this.addToken(TokenType.Function);
-            case "return":
-                return this.addToken(TokenType.Return);
+            // case "function":
+            //     return this.addToken(TokenType.Function);
+            // case "return":
+            //     return this.addToken(TokenType.Return);
 
             case "exit":
                 return this.addToken(TokenType.Exit);
@@ -220,8 +220,8 @@ class Tokenizer {
 
             case "double":
                 return this.addToken(TokenType.Double);
-            case "string":
-                return this.addToken(TokenType.String);
+            // case "string":
+            //     return this.addToken(TokenType.String);
             case "bool":
                 return this.addToken(TokenType.Bool);
 

@@ -18,6 +18,7 @@ class Interpreter {
             console.log("Error during tokenization on line: "+errorRecvd.line+" "+errorRecvd.message);
             return errorRecvd;
         }
+        console.log(tokenizer.tokens);
 
         let parser=new Parser(tokenizer.tokens);
         errorRecvd=parser.parse();
@@ -26,7 +27,7 @@ class Interpreter {
             console.log("Error during parse on line: "+errorRecvd.line+" "+errorRecvd.message);
             return errorRecvd;
         }
-
+        console.log(parser.debugCode);
         return null;
     }
 }
@@ -34,6 +35,6 @@ class Interpreter {
 
 
 let a=new Interpreter();
-console.log(a.runCode("function addBoth(double a, double b) double {\n\treturn a+b;\n}\n\n;exit addBoth(1,2);"));
+console.log(a.runCode("double a=0; "));
 
 module.exports=Interpreter;

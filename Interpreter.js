@@ -404,6 +404,8 @@ class Executable{
 				if (curOp.obj0.valType==="bool" || curOp.obj1.valType==="bool"){
 					//At least one is a bool, convert both to bools and compare
 					flagE=this.numToBool(curOp.obj0.value) === this.numToBool(curOp.obj1.value);
+					flagA=curOp.obj0.value > curOp.obj1.value;
+					flagB=curOp.obj0.value < curOp.obj1.value;
 				}else {
 					//Both are numbers
 					if (curOp.obj0.value > curOp.obj1.value) flagA=true;
