@@ -59,7 +59,6 @@ const TokenType = {
 
 
 	ToDouble: Symbol("todouble"),
-	ToBool: Symbol("tobool"),
 	ToString: Symbol("tostring"),
 
 	While: Symbol("while"),
@@ -243,8 +242,6 @@ class Tokenizer {
 
 			case "todouble":
 				return this.addToken(TokenType.ToDouble);
-			case "tobool":
-				return this.addToken(TokenType.ToBool);
 			case "tostring":
 				return this.addToken(TokenType.ToString);
 

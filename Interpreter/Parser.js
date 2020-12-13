@@ -69,7 +69,9 @@ class Parser {
 	
 	parse(){
 		this.pushAllocScope();
-		this.doBlock(null, null, false, false);
+		if (!this.doBlock(null, null, false, false)){
+			this.printLn("Error occured during parsing.");
+		}
 		this.popAllocScope();
 		return this.errorObj;
 	}
@@ -272,6 +274,7 @@ class Parser {
 				case IdentityType.String:
 					if (!this.doStringExpression()) return false;
 					this.printLn("push eax");
+					break;
 				default:
 					return this.setError("Invalid data type in function call parameter list "+identObj.params[i].toString());
 			}
@@ -303,6 +306,46 @@ class Parser {
 				return this.doFuncCall(true, true, false);
 		}
 		return this.setError("Invalid type in expression "+varName+":"+identObj.type.toString());
+	}
+
+
+	doToDouble(){
+		if (!this.match(TokenType.ToDouble)) return false;
+		if (!this.match(TokenType.LeftParen)) return false;
+		if (!this.doStringExpression()) return false;
+		this.printLn("todouble eax");
+		return this.match(TokenType.RightParen)
+	}
+
+	
+	doLen(){
+		if (!this.match(TokenType.Len)) return false;
+		if (!this.match(TokenType.LeftParen)) return false;
+		if (!this.doStringExpression()) return false;
+		this.printLn("len eax");
+		return this.match(TokenType.RightParen);
+	}
+	doStrCmp(){
+		if (!this.match(TokenType.StrCmp)) return false;
+		if (!this.match(TokenType.LeftParen)) return false;
+		if (!this.doStringExpression()) return false;
+		this.printLn("push eax");
+		if (!this.match(TokenType.Comma)) return false;
+		if (!this.doStringExpression()) return false;
+		this.printLn("pop ebx");
+		this.printLn("strcmp eax, ebx");
+		return this.match(TokenType.RightParen);
+	}
+	doStrICmp(){
+		if (!this.match(TokenType.StrICmp)) return false;
+		if (!this.match(TokenType.LeftParen)) return false;
+		if (!this.doStringExpression()) return false;
+		this.printLn("push eax");
+		if (!this.match(TokenType.Comma)) return false;
+		if (!this.doStringExpression()) return false;
+		this.printLn("pop ebx");
+		this.printLn("stricmp eax, ebx");
+		return this.match(TokenType.RightParen);
 	}
 
 	doFactor(){
@@ -353,6 +396,16 @@ class Parser {
 			return this.doFloor();
 		case TokenType.Ceil:
 			return this.doCeil();
+
+		case TokenType.Len:
+			return this.doLen();
+		case TokenType.StrCmp:
+			return this.doStrcmp();
+		case TokenType.StrICmp:
+			return this.doStrICmp();
+
+		case TokenType.ToDouble:
+			return this.doToDouble();
 		}
 		return this.setError("Expected factor but found "+this.token.type.toString()+":"+this.token.value);
 	}
@@ -520,13 +573,101 @@ class Parser {
 		return this.setError("Invalid type in expression "+varName+":"+identObj.type.toString());
 	}
 
+	doLCase(){
+		if (!this.match(TokenType.LCase)) return false;
+		if (!this.match(TokenType.LeftParen)) return false;
+		if (!this.doStringExpression()) return false;
+		this.printLn("lcase eax");
+		return this.match(TokenType.RightParen);
+	}
+	doUCase(){
+		if (!this.match(TokenType.UCase)) return false;
+		if (!this.match(TokenType.LeftParen)) return false;
+		if (!this.doStringExpression()) return false;
+		this.printLn("ucase eax");
+		return this.match(TokenType.RightParen);
+	}
+	doTrim(){
+		if (!this.match(TokenType.Trim)) return false;
+		if (!this.match(TokenType.LeftParen)) return false;
+		if (!this.doStringExpression()) return false;
+		this.printLn("trim eax");
+		return this.match(TokenType.RightParen);
+	}
+	doSubStr(){
+		if (!this.match(TokenType.SubStr)) return false;
+		if (!this.match(TokenType.LeftParen)) return false;
+		if (!this.doStringExpression()) return false;
+		this.printLn("push eax");
+		if (!this.match(TokenType.Comma)) return false;
+		if (!this.doExpression()) return false;
+		this.printLn("push eax");
+		if (!this.match(TokenType.Comma)) return false;
+		if (!this.doExpression()) return false;
+		this.printLn("push eax");
+		this.printLn("mov ecx, eax");
+		this.printLn("pop ebx");
+		this.printLn("pop eax");
+		this.printLn("substr eax, ebx, ecx");
+		return this.match(TokenType.RightParen);
+	}
+	doToString(){ 
+		if (!this.match(TokenType.ToString)) return false;
+		if (!this.match(TokenType.LeftParen)) return false;
+		if (!this.doExpression()) return false;
+		this.printLn("push eax");
+		if (!this.match(TokenType.Comma)) return false;
+		if (!this.doExpression()) return false;
+		this.printLn("mov ebx, eax");
+		this.printLn("pop eax");
+		this.printLn("tostring eax, ebx");
+		return this.match(TokenType.RightParen);
+	}
+
+	isStringExpressionToken(){
+		switch (this.token.type){
+			case TokenType.StringLiteral:
+				return true;
+			case TokenType.Ident:
+				const identObj = this.getIdentity(this.token.value, false);
+				if (!identObj) return this.setError("Trying to use undefined "+this.token.value);
+				switch (identObj.type){
+					case IdentityType.String:
+					case IdentityType.StringFunction:
+						return true;
+				}
+				return false;
+			case TokenType.LCase:
+				return true;
+			case TokenType.UCase:
+				return true;
+			case TokenType.Trim:
+				return true;
+			case TokenType.SubStr:
+				return true;
+			case TokenType.ToString:
+				return true;
+		}
+		return false;
+	}
+
 	doStringFactor(){
 		switch (this.token.type){
 			case TokenType.StringLiteral:
-				this.printLn("load eax, "+getFromStringPool(this.token.value));
+				this.printLn("load eax, "+this.getFromStringPool(this.token.value));
 				return this.match(TokenType.StringLiteral);
 			case TokenType.Ident:
 				return this.doStringExpressionIdent();
+			case TokenType.LCase:
+				return this.doLCase();
+			case TokenType.UCase:
+				return this.doUCase();
+			case TokenType.Trim:
+				return this.doTrim();
+			case TokenType.SubStr:
+				return this.doSubStr();
+			case TokenType.ToString:
+				return this.doToString();
 		}
 		return this.setError("Expected string factor, but got "+this.token.type.toString());
 	}
@@ -546,7 +687,16 @@ class Parser {
 		return true;
 	}
 
-	doIf(breakToBranch, returnToBranch){
+	doEitherExpression(){
+		if (this.isStringExpressionToken()){
+			if (!this.doStringExpression()) return false;
+			return IdentityType.String;
+		}
+		if (!this.doExpression()) return false;
+		return IdentityType.Double;
+	}
+
+	doIf(breakToBranch, returnToBranch, returnType){
 		const elseLabel = this.newBranch();
 		const endLabel = this.newBranch();
 		if (!this.match(TokenType.If)) return false;
@@ -558,7 +708,7 @@ class Parser {
 		this.printLn("test eax, eax");
 		this.printLn("je "+elseLabel);
 
-		if (!this.doBlock(breakToBranch, returnToBranch, false, true)) return false;
+		if (!this.doBlock(breakToBranch, returnToBranch, false, true, false, returnType)) return false;
 
 
 		if (this.token.type === TokenType.Else) {
@@ -567,7 +717,7 @@ class Parser {
 
 			if (!this.match(TokenType.Else)) return false;
 			
-			if (!this.doBlock(breakToBranch, returnToBranch, false, true)) return false;
+			if (!this.doBlock(breakToBranch, returnToBranch, false, true, false, returnType)) return false;
 			
 			this.printLn(endLabel+":");
 		}else{
@@ -577,7 +727,7 @@ class Parser {
 		return true;
 	}
 
-	doWhile(returnToBranch){
+	doWhile(returnToBranch, returnType){
 		const loopLabel = this.newBranch();
 		const endLabel = this.newBranch();
 		
@@ -592,7 +742,7 @@ class Parser {
 		this.printLn("test eax");
 		this.printLn("je "+endLabel);
 
-		if (!this.doBlock(endLabel, returnToBranch, false, true)) return false;
+		if (!this.doBlock(endLabel, returnToBranch, false, true, false, returnType)) return false;
 		
 		this.printLn("jmp "+loopLabel);
 		this.printLn(endLabel+":");
@@ -600,7 +750,7 @@ class Parser {
 		return true;
 	}
 
-	doFor(returnToBranch){
+	doFor(returnToBranch, returnType){
 		const compareLabel = this.newBranch();
 		const incLabel = this.newBranch();
 		const blockLabel = this.newBranch();
@@ -653,7 +803,7 @@ class Parser {
 
 		this.printLn("[blk"+blockLabel+"]");
 
-		if (!this.doBlock(endLabel, returnToBranch, false, true)) return false;//{ block }
+		if (!this.doBlock(endLabel, returnToBranch, false, true, false, returnType)) return false;//{ block }
 
 		this.printLn("jmp [inc"+incLabel+"]");
 		this.printLn("[end"+endLabel+"]");
@@ -663,7 +813,7 @@ class Parser {
 		return true;
 	}
 
-	doLoop(returnToBranch){
+	doLoop(returnToBranch, returnType){
 		const loopLabel = this.newBranch();
 		const endLabel = this.newBranch();
 
@@ -671,7 +821,7 @@ class Parser {
 
 		if (!this.match(TokenType.Loop)) return false;
 
-		if (!this.doBlock(endLabel, returnToBranch, false, true)) return false;//{ block }
+		if (!this.doBlock(endLabel, returnToBranch, false, true, false, returnType)) return false;//{ block }
 		
 		if (!this.match(TokenType.While)) return false;
 		if (!this.match(TokenType.LeftParen)) return false;
@@ -695,7 +845,7 @@ class Parser {
 	doExit(){
 		if (!this.match(TokenType.Exit)) return false;
 		if (this.token.type !== TokenType.LineDelim){
-			if (!this.doExpression()) return false;
+			if (!this.doEitherExpression()) return false;
 			this.printLn("exit eax");
 		}else{
 			this.printLn("exit nil");
@@ -716,6 +866,8 @@ class Parser {
 			
 			let identObj = this.addDouble(doubleName);
 			if (!identObj) return false;
+
+			this.printLn("double ["+identObj.scope+"]["+identObj.index+"] // "+doubleName);
 
 			if (this.token.type===TokenType.Assignment){
 				if (!this.match(TokenType.Assignment)) return false;
@@ -745,6 +897,8 @@ class Parser {
 			
 			let identObj = this.addBool(doubleName);
 			if (!identObj) return false;
+			
+			this.printLn("bool ["+identObj.scope+"]["+identObj.index+"] // "+boolName);
 
 			if (this.token.type===TokenType.Assignment){
 				if (!this.match(TokenType.Assignment)) return false;
@@ -775,6 +929,8 @@ class Parser {
 			let identObj = this.addString(stringName);
 			if (!identObj) return false;
 
+			this.printLn("string ["+identObj.scope+"]["+identObj.index+"] // "+stringName);
+
 			if (this.token.type===TokenType.Assignment){
 				if (!this.match(TokenType.Assignment)) return false;
 				if (!this.doStringExpression()) return false;
@@ -797,7 +953,6 @@ class Parser {
 		const funcBlockBranch = this.newBranch();
 
 		this.printLn("jmp ["+skipFuncBranch+"]");
-		
 
 		this.pushAllocScope();
 		this.printLn("jmp ["+setupStackFrameBranch+"] //function "+name);
@@ -862,7 +1017,8 @@ class Parser {
 			}
 		}
 
-		if (!this.doBlock(null, returnToBranch, true, true, true)) return false;
+		if (!this.doBlock(null, returnToBranch, true, true, true, type)) return false;
+
 		this.popScope();
 
 		this.printLn("mov eax, nil");
@@ -872,6 +1028,7 @@ class Parser {
 
 		this.printLn("["+setupStackFrameBranch+"]");
 		this.printLn("pushScope "+this.allocScopeIndex+", "+this.allocScope[this.allocScopeIndex]);
+
 
 		for (let i=paramObjs.length-1;i>=0;i--){
 			this.printLn("pop ["+paramObjs[i].scope+"]["+paramObjs[i].index+"]// "+paramObjs[i].name);
@@ -886,10 +1043,20 @@ class Parser {
 		return true;
 	}
 
-	doReturn(returnToBranch){
+	doReturn(returnToBranch, returnType){
 		if (!this.match(TokenType.Return)) return false;
 		if (this.token.type!==TokenType.LineDelim){
-			if (!this.doExpression()) return false;
+			switch (returnType){
+				case IdentityType.DoubleFunction:
+				case IdentityType.BoolFunction:
+					if (!this.doExpression()) return false;
+					break;
+				case IdentityType.StringFunction:
+					if (!this.doStringExpression()) return false;
+					break;
+				default:
+					return this.setError("Expected return type of "+returnType.toString());
+			}
 		}else{
 			this.printLn("mov eax, nil");
 		}
@@ -942,16 +1109,16 @@ class Parser {
 		return this.setError("Invalid identity type "+identName+":"+identObj.type.toString())
 	}
 
-	doStatement(breakToBranch, returnToBranch){
+	doStatement(breakToBranch, returnToBranch, returnType){
 		switch (this.token.type){
 			case TokenType.If:
-				return this.doIf(breakToBranch, returnToBranch);
+				return this.doIf(breakToBranch, returnToBranch, returnType);
 			case TokenType.While:
-				return this.doWhile(returnToBranch);
+				return this.doWhile(returnToBranch, returnType);
 			case TokenType.For:
-				return this.doFor(returnToBranch);
+				return this.doFor(returnToBranch, returnType);
 			case TokenType.Loop:
-				return this.doLoop(returnToBranch);
+				return this.doLoop(returnToBranch, returnType);
 			case TokenType.Break:
 				return this.doBreak(breakToBranch);
 
@@ -959,7 +1126,7 @@ class Parser {
 				return this.doExit();
 
 			case TokenType.Return:
-				return this.doReturn(returnToBranch);
+				return this.doReturn(returnToBranch, returnType);
 
 			case TokenType.Double:
 				return this.doDouble();
@@ -972,7 +1139,7 @@ class Parser {
 				return this.doIdentStatement();
 				
 			case TokenType.LeftCurly:
-				return this.doBlock(breakToBranch, returnToBranch, true, false);
+				return this.doBlock(breakToBranch, returnToBranch, true, false, false, returnType);
 
 			case TokenType.LineDelim:
 				return this.match(TokenType.LineDelim);
@@ -980,7 +1147,7 @@ class Parser {
 		return this.setError("Unexpected token in block, "+this.token.type.toString());
 	}
 
-	doBlock(breakToBranch, returnToBranch, ifNeedsCurlys, couldBeStatment, dontPushScope=false){
+	doBlock(breakToBranch, returnToBranch, ifNeedsCurlys, couldBeStatment, dontPushScope=false, returnType=null){
 		if (!dontPushScope) this.pushScope();
 
 		let hasCurlys = false;
@@ -999,7 +1166,7 @@ class Parser {
 				} 
 				return this.setError("Unexpected token in block, "+this.token.type.toString());
 			}
-			if (!this.doStatement(breakToBranch, returnToBranch)) return false;
+			if (!this.doStatement(breakToBranch, returnToBranch, returnType)) return false;
 
 			if (couldBeStatment && hasCurlys===false) break;
 		}

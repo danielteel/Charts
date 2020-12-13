@@ -35,13 +35,16 @@ class Interpreter {
 
 
 let a=new Interpreter();
-console.log(a.runCode("string name='asd';"));
-// double this=100;
-// double times2(){
-//     double internal(){
-//         return 1;
-//     }
-//     return times2()*internal();
-// }
-// times2();
+console.log(a.runCode(` bool isLegalDrinker(double age){
+                            if (age>=21) return true;
+                            return false;
+                        }
+                        double age=0;
+                        while (age<100){
+                            if (isLegalDrinker(age)) exit age;
+                            age=age+1;
+                        }
+                        age=age+100;
+                        exit todouble(tostring(abs(age),0));
+                        `));
 module.exports=Interpreter;
