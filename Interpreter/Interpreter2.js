@@ -35,6 +35,13 @@ class Interpreter {
 
 
 let a=new Interpreter();
-console.log(a.runCode("double a=0; "));
-
+console.log(a.runCode("string name='asd';"));
+// double this=100;
+// double times2(){
+//     double internal(){
+//         return 1;
+//     }
+//     return times2()*internal();
+// }
+// times2();
 module.exports=Interpreter;

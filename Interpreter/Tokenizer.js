@@ -49,7 +49,18 @@ const TokenType = {
     Floor: Symbol("floor"),
     Ceil: Symbol("ceiling"),
 
-    Function: Symbol("function"),
+    LCase: Symbol("lcase"),
+    UCase: Symbol("ucase"),
+    Trim: Symbol("trim"),
+    Len: Symbol("len"),
+    StrCmp: Symbol("strcmp"),
+    StrICmp: Symbol("stricmp"),
+    SubStr: Symbol("substr"),
+
+
+    ToDouble: Symbol("todouble"),
+    ToBool: Symbol("tobool"),
+    ToString: Symbol("tostring"),
 
     While: Symbol("while"),
     For: Symbol("for"),
@@ -61,7 +72,6 @@ const TokenType = {
     RightCurly: Symbol("}"),
 
     Return: Symbol("return"),
-    This: Symbol("this"),
     Exit: Symbol("exit")
 };
 
@@ -197,10 +207,8 @@ class Tokenizer {
             case "break":
                 return this.addToken(TokenType.Break);
 
-            // case "function":
-            //     return this.addToken(TokenType.Function);
-            // case "return":
-            //     return this.addToken(TokenType.Return);
+            case "return":
+                return this.addToken(TokenType.Return);
 
             case "exit":
                 return this.addToken(TokenType.Exit);
@@ -218,15 +226,34 @@ class Tokenizer {
             case "abs":
                 return this.addToken(TokenType.Abs);
 
+            case "lcase":
+                return this.addToken(TokenType.LCase)
+            case "ucase":
+                return this.addToken(TokenType.UCase)
+            case "trim":
+                return this.addToken(TokenType.Trim)
+            case "len":
+                return this.addToken(TokenType.Len)
+            case "strcmp":
+                return this.addToken(TokenType.StrCmp)
+            case "stricmp":
+                return this.addToken(TokenType.StrICmp)
+            case "substr":
+                return this.addToken(TokenType.SubStr)
+
+            case "todouble":
+                return this.addToken(TokenType.ToDouble);
+            case "tobool":
+                return this.addToken(TokenType.ToBool);
+            case "tostring":
+                return this.addToken(TokenType.ToString);
+
             case "double":
                 return this.addToken(TokenType.Double);
-            // case "string":
-            //     return this.addToken(TokenType.String);
+            case "string":
+                return this.addToken(TokenType.String);
             case "bool":
                 return this.addToken(TokenType.Bool);
-
-            case "this":
-                return this.addToken(TokenType.This);
 
             case "true":
                 return this.addToken(TokenType.True);

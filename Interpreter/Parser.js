@@ -2,12 +2,15 @@ const Utils = require("./Utils");
 const TokenType=require("./Tokenizer").TokenType;
 
 
-const ICOpType={
-    
+const IdentityType = {
+    Bool: Symbol("Bool"),
+    Double: Symbol("Double"),
+    String: Symbol("String"),
+
+    BoolFunction: Symbol("Bool function"),
+    DoubleFunction: Symbol("Double function"),
+    StringFunction: Symbol("String function")
 }
-
-
-
 
 class Parser {
     constructor(tokens){
@@ -22,12 +25,17 @@ class Parser {
 
         this.branchCounter=1;
 
-        this.namespaceIndex=0;
-        this.namespaces=[[]];
+        this.stringPool=[];
+
+        this.scopeIndex=0;
+        this.scopes=[[]];
+
+        this.allocScope=[0];
+        this.allocScopeIndex=0;
     }
 
     printLn(code){
-        this.debugCode+=code+'\n';
+        this.debugCode+="\t".repeat(this.scopeIndex+this.allocScopeIndex)+code+'\n';
     }
 
     newBranch(){
@@ -60,27 +68,72 @@ class Parser {
     }
     
     parse(){
-        this.doBlock(null, null, false);
+        this.pushAllocScope();
+        this.doBlock(null, null, false, false);
+        this.popAllocScope();
         return this.errorObj;
     }
     
-    pushNamespace(){
-        this.namespaceIndex++;
+    pushAllocScope(){
+        this.allocScope[++this.allocScopeIndex]=[0];
     }
-    popNamespace(){
-        this.namespaceIndex--;
+    popAllocScope(){
+        this.allocScope[this.allocScopeIndex--]=undefined;
     }
 
+    pushScope(){
+        this.scopes[++this.scopeIndex]=[];
+    }
+    popScope(){
+        this.scopes[this.scopeIndex--]=undefined;
+    }
+    addToCurrentScope(name, type, branch=null, params=null){
+        const alreadyExists=this.getIdentity(name, true);
+        if (alreadyExists !== null) return this.setError("Duplicate define, "+name+" already exists in current scope as "+alreadyExists.name+":"+alreadyExists.type.toString());
+        let obj={name: name, type: type, branch: branch, params: params, scope: this.allocScopeIndex, index: this.allocScope[this.allocScopeIndex]};
+        this.scopes[this.scopeIndex].push(obj);
+        switch (type){
+            case IdentityType.Bool:
+            case IdentityType.Double:
+            case IdentityType.String:
+                this.allocScope[this.allocScopeIndex]++;
+                break;
+        }
+        return obj;
+    }
+
+    getFromStringPool(string){
+        let stringIndex=this.stringPool.indexOf(string);
+        if (stringIndex<0){
+            this.stringPool.push(string);
+            stringIndex=this.stringPool.length-1;
+        }
+        return stringIndex;
+    }
 
     
+
+    getIdentity(name, onlyInCurrentScope=false){
+        let index=0;
+        for (let i = this.scopeIndex;i>=0;i--){
+            let identity = this.scopes[i].find( (current, i) => {index=i; return name === current.name} );
+            if (identity) return identity;
+            if (onlyInCurrentScope) break;
+        }
+        return null;
+    }
+
     addBool(name){
-        
+        return this.addToCurrentScope(name, IdentityType.Bool);
     }
     addDouble(name){
-
+        return this.addToCurrentScope(name, IdentityType.Double);
     }
-    addFunction(name, params){
-
+    addString(name){
+        return this.addToCurrentScope(name, IdentityType.String);
+    }
+    addFunction(name, functionType, branch, params){
+        return this.addToCurrentScope(name, functionType, branch, params);
     }
 
 	isPowerOp(){
@@ -194,10 +247,62 @@ class Parser {
 		return this.match(TokenType.RightParen);
     }
 
+    doFuncCall(allowBool, allowDouble, allowString){
+        let funcName=this.token.value;
+        let identObj = this.getIdentity(funcName);
+        if (!identObj) return this.setError("Tried to call undefined function'"+funcName+"'");
+
+        if (identObj.type===TokenType.BoolFunction && allowBool===false) return this.setError("Cant call a function ("+funcName+") of type bool right here");
+        if (identObj.type===TokenType.DoubleFunction && allowDouble===false) return this.setError("Cant call a function ("+funcName+") of type double right here");
+        if (identObj.type===TokenType.StringFunction && allowString===false) return this.setError("Cant call a function ("+funcName+") of type string right here");
+
+        if (!this.match(TokenType.Ident)) return false;
+        if (!this.match(TokenType.LeftParen)) return false;
+
+        for (let i=0;i<identObj.params.length;i++){
+            switch (identObj.params[i]){
+                case IdentityType.Double:
+                    if (!this.doExpression()) return false;
+                    this.printLn("push eax");
+                    break;
+                case IdentityType.Bool:
+                    if (!this.doExpression()) return false;
+                    this.printLn("push eax");
+                    break;
+                case IdentityType.String:
+                    if (!this.doStringExpression()) return false;
+                    this.printLn("push eax");
+                default:
+                    return this.setError("Invalid data type in function call parameter list "+identObj.params[i].toString());
+            }
+            if (i<identObj.params.length-1){
+                if (!this.match(TokenType.Comma)) return false;
+            }
+        }
+
+        if (!this.match(TokenType.RightParen)) return false;
+
+        this.printLn("call ["+identObj.branch+"] //"+funcName)
+
+        return true;
+    }
 
     doIdent(){
-        this.printLn("mov eax, v_"+this.token.value);
-        return this.match(TokenType.Ident);
+        let varName=this.token.value;
+        let identObj = this.getIdentity(varName);
+        if (!identObj) return this.setError("Tried to access undefined '"+varName+"'");
+
+        switch (identObj.type){
+            case IdentityType.Double:
+            case IdentityType.Bool:
+                this.printLn("mov eax, ["+identObj.scope+"]["+identObj.index+"] // "+varName);
+                return this.match(TokenType.Ident);
+
+            case IdentityType.DoubleFunction:
+            case IdentityType.BoolFunction:
+                return this.doFuncCall(true, true, false);
+        }
+        return this.setError("Invalid type in expression "+varName+":"+identObj.type.toString());
     }
 
 	doFactor(){
@@ -235,11 +340,7 @@ class Parser {
 		case TokenType.False:
             this.printLn("mov eax, false");
             return this.match(TokenType.False);    
-        case TokenType.This:
-            this.printLn("mov eax, this");
-            return this.match(TokenType.This);
-            
-            
+
         case TokenType.Min:
             return this.doMin();
         case TokenType.Max:
@@ -253,7 +354,7 @@ class Parser {
         case TokenType.Ceil:
             return this.doCeil();
 		}
-		return this.setError("Expected factor but found "+this.token.type+":"+this.token.value);
+		return this.setError("Expected factor but found "+this.token.type.toString()+":"+this.token.value);
 	}
 
 
@@ -402,6 +503,49 @@ class Parser {
 		return true;
     }
 
+
+    doStringExpressionIdent(){
+        let varName=this.token.value;
+        let identObj = this.getIdentity(varName);
+        if (!identObj) return this.setError("Tried to access undefined '"+varName+"'");
+
+        switch (identObj.type){
+            case IdentityType.String:
+                this.printLn("mov eax, ["+identObj.scope+"]["+identObj.index+"] // "+varName);
+                return this.match(TokenType.Ident);
+
+            case IdentityType.StringFunction:
+                return this.doFuncCall(true, true, false);
+        }
+        return this.setError("Invalid type in expression "+varName+":"+identObj.type.toString());
+    }
+
+    doStringFactor(){
+        switch (this.token.type){
+            case TokenType.StringLiteral:
+                this.printLn("load eax, "+getFromStringPool(this.token.value));
+                return this.match(TokenType.StringLiteral);
+            case TokenType.Ident:
+                return this.doStringExpressionIdent();
+        }
+        return this.setError("Expected string factor, but got "+this.token.type.toString());
+    }
+
+    doStringExpression(){
+        if (!this.doStringFactor()) return false;
+        
+		while (this.token.type===TokenType.Plus){
+            this.printLn("push eax");
+            if (!this.match(TokenType.Plus)) return false;
+            if (!this.doStringFactor()) return false;
+            this.printLn("pop ebx");
+            this.printLn("concat ebx, eax");
+            this.printLn("mov eax, ebx");
+        }
+        
+		return true;
+    }
+
     doIf(breakToBranch, returnToBranch){
         const elseLabel = this.newBranch();
         const endLabel = this.newBranch();
@@ -414,32 +558,22 @@ class Parser {
         this.printLn("test eax, eax");
         this.printLn("je "+elseLabel);
 
-        if (this.token.type === TokenType.LeftCurly){
-            if (!this.match(TokenType.LeftCurly)) return false;
-            if (!this.doBlock(breakToBranch, returnToBranch, true)) return false;
-            if (!this.match(TokenType.RightCurly)) return false;
-        }else{
-            if (!this.doStatement(breakToBranch, returnToBranch)) return false;
-        }
+        if (!this.doBlock(breakToBranch, returnToBranch, false, true)) return false;
 
-        this.printLn("jmp "+endLabel);
-        this.printLn(elseLabel+":");
 
         if (this.token.type === TokenType.Else) {
+            this.printLn("jmp "+endLabel);
+            this.printLn(elseLabel+":");
+
             if (!this.match(TokenType.Else)) return false;
-            if (this.token.type === TokenType.If) {
-                if (!this.doIf(breakToBranch)) return false;
-            } else {
-                if (this.token.type === TokenType.LeftCurly){
-                    if (!this.match(TokenType.LeftCurly)) return false;
-                    if (!this.doBlock(breakToBranch, returnToBranch, true)) return false;
-                    if (!this.match(TokenType.RightCurly)) return false;
-                }else{
-                    if (!this.doStatement(breakToBranch, returnToBranch)) return false;
-                }
-            }
+            
+            if (!this.doBlock(breakToBranch, returnToBranch, false, true)) return false;
+            
+            this.printLn(endLabel+":");
+        }else{
+            this.printLn(elseLabel+":");
         }
-        this.printLn(endLabel+":");
+        
         return true;
     }
 
@@ -448,7 +582,7 @@ class Parser {
         const endLabel = this.newBranch();
         
         if (!this.match(TokenType.While)) return false;
-        
+
         this.printLn(loopLabel+":");
 
 		if (!this.match(TokenType.LeftParen)) return false;
@@ -458,16 +592,11 @@ class Parser {
         this.printLn("test eax");
         this.printLn("je "+endLabel);
 
-        if (this.token.type === TokenType.LeftCurly){
-            if (!this.match(TokenType.LeftCurly)) return false;
-            if (!this.doBlock(endLabel, returnToBranch, true)) return false;
-            if (!this.match(TokenType.RightCurly)) return false;
-        }else{
-            if (!this.doStatement(endLabel, returnToBranch)) return false;
-        }
+        if (!this.doBlock(endLabel, returnToBranch, false, true)) return false;
         
         this.printLn("jmp "+loopLabel);
         this.printLn(endLabel+":");
+
 		return true;
     }
 
@@ -476,6 +605,8 @@ class Parser {
         const incLabel = this.newBranch();
         const blockLabel = this.newBranch();
         const endLabel = this.newBranch();
+
+        this.pushScope();
 
         if (!this.match(TokenType.For)) return false;//                         for
         if (!this.match(TokenType.LeftParen)) return false;//                   (
@@ -488,17 +619,16 @@ class Parser {
                 case TokenType.Double:
                     if (!this.doDouble()) return false;
                     break;
-                // case TokenType.String:
-                //     if (!this.doString()) return false;
-                //     break;
+                 case TokenType.String:
+                     if (!this.doString()) return false;
+                     break;
                 default:
                     if (!this.doAssignment()) return false; 
                     break;
             }
         }else{
-            if (!this.match(TokenType.LineDelim)) return false;
+            if (!this.match(TokenType.LineDelim)) return false;//               ;
         }
-                ;
 
         this.printLn("[cmp"+compareLabel+"]");
 
@@ -523,16 +653,12 @@ class Parser {
 
         this.printLn("[blk"+blockLabel+"]");
 
-        if (this.token.type === TokenType.LeftCurly){                       //  {
-            if (!this.match(TokenType.LeftCurly)) return false;
-            if (!this.doBlock(endLabel, returnToBranch, true)) return false;//  <block>
-            if (!this.match(TokenType.RightCurly)) return false;            //  }
-        }else{
-            if (!this.doStatement(endLabel, returnToBranch)) return false;  // statement
-        }
+        if (!this.doBlock(endLabel, returnToBranch, false, true)) return false;//{ block }
 
         this.printLn("jmp [inc"+incLabel+"]");
         this.printLn("[end"+endLabel+"]");
+
+        this.popScope();
 
         return true;
     }
@@ -545,13 +671,7 @@ class Parser {
 
         if (!this.match(TokenType.Loop)) return false;
 
-        if (this.token.type === TokenType.LeftCurly){
-            if (!this.match(TokenType.LeftCurly)) return false;
-            if (!this.doBlock(endLabel, returnToBranch, true)) return false;
-            if (!this.match(TokenType.RightCurly)) return false;
-        }else{
-            if (!this.doStatement(endLabel, returnToBranch)) return false;
-        }
+        if (!this.doBlock(endLabel, returnToBranch, false, true)) return false;//{ block }
         
         if (!this.match(TokenType.While)) return false;
 		if (!this.match(TokenType.LeftParen)) return false;
@@ -589,11 +709,20 @@ class Parser {
         do {
             let doubleName = this.token.value;
             if (!this.match(TokenType.Ident)) return false;
+
+            if (this.token.type===TokenType.LeftParen){//its a function definition
+                return this.doFunction(doubleName, IdentityType.DoubleFunction);
+            }
             
+            let identObj = this.addDouble(doubleName);
+            if (!identObj) return false;
+
             if (this.token.type===TokenType.Assignment){
                 if (!this.match(TokenType.Assignment)) return false;
                 if (!this.doExpression()) return false;
-                this.printLn("mov v_"+doubleName+", eax");
+                this.printLn("mov ["+identObj.scope+"]["+identObj.index+"], eax // "+doubleName);
+            }else{
+                this.printLn("mov ["+identObj.scope+"]["+identObj.index+"], nil // "+doubleName);
             }
 
             if (this.token.type===TokenType.Comma){
@@ -609,11 +738,20 @@ class Parser {
         do {
             let boolName = this.token.value;
             if (!this.match(TokenType.Ident)) return false;
+
+            if (this.token.type===TokenType.LeftParen){//its a function definition
+                return this.doFunction(boolName, IdentityType.BoolFunction);
+            }
             
+            let identObj = this.addBool(doubleName);
+            if (!identObj) return false;
+
             if (this.token.type===TokenType.Assignment){
                 if (!this.match(TokenType.Assignment)) return false;
                 if (!this.doExpression()) return false;
-                this.printLn("mov v_"+boolName+", eax");
+                this.printLn("mov ["+identObj.scope+"]["+identObj.index+"], eax // "+boolName);
+            }else{
+                this.printLn("mov ["+identObj.scope+"]["+identObj.index+"], nil // "+boolName);
             }
 
             if (this.token.type===TokenType.Comma){
@@ -623,22 +761,185 @@ class Parser {
         return this.match(TokenType.LineDelim);
     }
 
-    doThis(){
-        if (!this.match(TokenType.This)) return false;
-        if (!this.match(TokenType.Assignment)) return false;
-        if (!this.doExpression()) return false;
-        this.printLn("mov this, eax");   
+    doString(){
+        if (!this.match(TokenType.String)) return false;
+
+        do {
+            let stringName = this.token.value;
+            if (!this.match(TokenType.Ident)) return false;
+
+            if (this.token.type===TokenType.LeftParen){//its a function definition
+                return this.doFunction(stringName, IdentityType.StringFunction);
+            }
+            
+            let identObj = this.addString(stringName);
+            if (!identObj) return false;
+
+            if (this.token.type===TokenType.Assignment){
+                if (!this.match(TokenType.Assignment)) return false;
+                if (!this.doStringExpression()) return false;
+                this.printLn("mov ["+identObj.scope+"]["+identObj.index+"], eax // "+stringName);
+            }else{
+                this.printLn("mov ["+identObj.scope+"]["+identObj.index+"], nil // "+stringName);
+            }
+
+            if (this.token.type===TokenType.Comma){
+                if (!this.match(TokenType.Comma)) return false;
+            }
+        } while (this.token.type!==TokenType.LineDelim)
         return this.match(TokenType.LineDelim);
     }
 
+    doFunction(name, type){
+        const returnToBranch=this.newBranch();
+        const skipFuncBranch = this.newBranch();
+        const setupStackFrameBranch = this.newBranch();
+        const funcBlockBranch = this.newBranch();
+
+        this.printLn("jmp ["+skipFuncBranch+"]");
+        
+
+        this.pushAllocScope();
+        this.printLn("jmp ["+setupStackFrameBranch+"] //function "+name);
+
+        this.printLn("["+funcBlockBranch+"]");
+
+        let paramTypes=[];
+        let paramIdents=[];
+        let paramObjs=[];
+
+        if (!this.match(TokenType.LeftParen)) return false;
+        while (this.token.type!==TokenType.RightParen){
+            switch (this.token.type){
+                case TokenType.Double:
+                    paramTypes.push(IdentityType.Double);
+                    break;
+                case TokenType.Bool:
+                    paramTypes.push(IdentityType.Bool);
+                    break;
+                case TokenType.String:
+                    paramTypes.push(IdentityType.String);
+                    break;
+                default:
+                    return this.setError("Unexpected token in parameter list "+this.token.type.toString());
+            }
+            if (!this.match(this.token.type)) return false;
+
+            paramIdents.push(this.token.value);
+            if (!this.match(TokenType.Ident)) return false;
+
+            if (this.token.type === TokenType.Comma){
+                if (!this.match(TokenType.Comma)) return false;
+                if (this.token.type===TokenType.RightParen) return this.setError("Expected another parameter, but got a )");
+            }
+        }
+        if (!this.match(TokenType.RightParen)) return false;
+        
+        let identObj = this.addFunction(name, type, setupStackFrameBranch, paramTypes);
+        if (!identObj) return false;
+
+        this.pushScope();
+        for (let i=0;i<paramIdents.length;i++){
+            let obj=null;
+            switch (paramTypes[i]){
+                case IdentityType.Double:
+                    obj=this.addDouble(paramIdents[i]);
+                    paramObjs.push(obj);
+                    if (!obj) return false;
+                    break;
+                case IdentityType.Bool:
+                    obj=this.addBool(paramIdents[i]);
+                    paramObjs.push(obj);
+                    if (!obj) return false;
+                    break;
+                case IdentityType.String:
+                    obj=this.addString(paramIdents[i]);
+                    paramObjs.push(obj);
+                    if (!obj) return false;
+                    break;
+                default:
+                    return this.setError("Unexpected type in parameter list allocation "+paramTypes[i].toString());
+            }
+        }
+
+        if (!this.doBlock(null, returnToBranch, true, true, true)) return false;
+        this.popScope();
+
+        this.printLn("mov eax, nil");
+        this.printLn("["+returnToBranch+"]");
+        this.printLn("popScope "+this.allocScopeIndex);
+        this.printLn("ret");
+
+        this.printLn("["+setupStackFrameBranch+"]");
+        this.printLn("pushScope "+this.allocScopeIndex+", "+this.allocScope[this.allocScopeIndex]);
+
+        for (let i=paramObjs.length-1;i>=0;i--){
+            this.printLn("pop ["+paramObjs[i].scope+"]["+paramObjs[i].index+"]// "+paramObjs[i].name);
+        }
+
+        this.printLn("jmp ["+funcBlockBranch+"]");
+
+        this.popAllocScope();
+
+        this.printLn("["+skipFuncBranch+"]");
+
+        return true;
+    }
+
+    doReturn(returnToBranch){
+        if (!this.match(TokenType.Return)) return false;
+        if (this.token.type!==TokenType.LineDelim){
+            if (!this.doExpression()) return false;
+        }else{
+            this.printLn("mov eax, nil");
+        }
+        this.printLn("jmp ["+returnToBranch+"]");
+        return this.match(TokenType.LineDelim);
+    }
+    
     doAssignment(wantsDelim=true){
         let varName=this.token.value;
+
         if (!this.match(TokenType.Ident)) return false;
+        let identObj = this.getIdentity(varName);
+        if (!identObj) return this.setError("Tried to assign to undefined '"+varName+"'");
+
         if (!this.match(TokenType.Assignment)) return false;
-        if (!this.doExpression()) return false;
-        this.printLn("mov v_"+varName+", eax");   
+
+        switch (identObj.type){
+            case IdentityType.String:
+                if (!this.doStringExpression()) return false;
+                break;
+            case IdentityType.Double:
+            case IdentityType.Bool:
+                if (!this.doExpression()) return false;
+                break;
+            default:
+                return this.setError("Tried to do assignment to invalid type");
+        }
+        this.printLn("mov ["+identObj.scope+"]["+identObj.index+"], eax // "+varName);
+
         if (wantsDelim===true) return this.match(TokenType.LineDelim);
         return true;
+    }
+
+    doIdentStatement(){
+        let identName = this.token.value;
+
+        let identObj = this.getIdentity(identName);
+        if (!identObj) return this.setError("Trying to operate on undefined '"+identName+"'");
+
+        switch (identObj.type){
+            case IdentityType.Double:
+            case IdentityType.Bool:
+            case IdentityType.String:
+                return this.doAssignment();
+            case IdentityType.BoolFunction:
+            case IdentityType.DoubleFunction:
+            case IdentityType.StringFunction:
+                return this.doFuncCall(true, true, true);
+        }
+        return this.setError("Invalid identity type "+identName+":"+identObj.type.toString())
     }
 
     doStatement(breakToBranch, returnToBranch){
@@ -654,41 +955,59 @@ class Parser {
 			case TokenType.Break:
                 return this.doBreak(breakToBranch);
 
-            // case TokenType.Function:
-            //     return this.doFunction();
-			// case TokenType.Return:
-			// 	return this.doReturn(returnToBranch);
-
             case TokenType.Exit:
                 return this.doExit();
 
+			case TokenType.Return:
+				return this.doReturn(returnToBranch);
+
             case TokenType.Double:
                 return this.doDouble();
-            // case TokenType.String:
-            //     return this.doString();
+            case TokenType.String:
+                return this.doString();
             case TokenType.Bool:
                 return this.doBool();
 
-			case TokenType.This:
-                return this.doThis();
-                
 			case TokenType.Ident:
-				return this.doAssignment();
+				return this.doIdentStatement();
                 
+            case TokenType.LeftCurly:
+                return this.doBlock(breakToBranch, returnToBranch, true, false);
+
 			case TokenType.LineDelim:
                 return this.match(TokenType.LineDelim);
 		}
         return this.setError("Unexpected token in block, "+this.token.type.toString());
     }
 
-    doBlock(breakToBranch, returnToBranch, ifWantsRightCurly){
+    doBlock(breakToBranch, returnToBranch, ifNeedsCurlys, couldBeStatment, dontPushScope=false){
+        if (!dontPushScope) this.pushScope();
+
+        let hasCurlys = false;
+
+        if (ifNeedsCurlys || this.token.type===TokenType.LeftCurly){
+            if (!this.match(TokenType.LeftCurly)) return false;
+            hasCurlys=true;
+        }  
+
 		while (this.isNotEnd()){
             if (this.token.type===TokenType.RightCurly){
-				if (ifWantsRightCurly) return true;
-                return this.setError("Unexpected token in block, "+this.token.type);
+				if (hasCurlys){
+                    this.match(TokenType.RightCurly);
+                    hasCurlys=false;
+                    break;
+                } 
+                return this.setError("Unexpected token in block, "+this.token.type.toString());
             }
-            if (!this.doStatement(breakToBranch, returnToBranch, ifWantsRightCurly)) return false;
-		}
+            if (!this.doStatement(breakToBranch, returnToBranch)) return false;
+
+            if (couldBeStatment && hasCurlys===false) break;
+        }
+
+        if (hasCurlys) return this.setError("Got to the end of the file without getting an expected "+TokenType.RightCurly.toString());
+
+        if (!dontPushScope) this.popScope();
+
 		return true;
 	}
 }
