@@ -1,8 +1,8 @@
 const Utils = require('./Utils');
-const {OpObjType, OpObj, RegisterObj, StringObj, NumberObj, BoolObj, Machine}=require('./Machine');
+const {OpObjType, OpObj, RegisterObj, StringObj, NumberObj, BoolObj, Machine}=require('./OpObjs');
 
 const Tokenizer = require('./Tokenizer');
-const Parser = require('./Parser');
+const {Parser, IdentityType} = require('./Parser');
 
 
 class Interpreter {
@@ -10,7 +10,6 @@ class Interpreter {
     }
 
     runCode(code){
-        
         let tokenizer=new Tokenizer(code);
         let errorRecvd=tokenizer.tokenize();
 
@@ -18,10 +17,9 @@ class Interpreter {
             console.log("Error during tokenization on line: "+errorRecvd.line+" "+errorRecvd.message);
             return errorRecvd;
         }
-        console.log(tokenizer.tokens);
 
         let parser=new Parser(tokenizer.tokens);
-        errorRecvd=parser.parse();
+        errorRecvd=parser.parse([ {name: "age", type: IdentityType.Double}, {name: "print", type: IdentityType.BoolFunction, params:[IdentityType.String]} ]);
 
         if (errorRecvd!==null){
             console.log("Error during parse on line: "+errorRecvd.line+" "+errorRecvd.message);
@@ -39,12 +37,31 @@ console.log(a.runCode(` bool isLegalDrinker(double age){
                             if (age>=21) return true;
                             return false;
                         }
-                        double age=0;
-                        while (age<100){
-                            if (isLegalDrinker(age)) exit age;
-                            age=age+1;
+
+
+                        if (!isLegalDrinker(age)){
+                            print("You cannot drink yet!");
+                            exit false;
+                        }else{
+                            print("Drink away my boy!");
+                            exit true;
                         }
-                        age=age+100;
-                        exit todouble(tostring(abs(age),0));
                         `));
 module.exports=Interpreter;
+
+
+function longestRun(string) {
+    let longest=[0, 0];
+    for (let i=0; i < string.length; i++) {
+        var run=[i, i];
+        for (let j=i+1; j<string.length; j++) {
+            if (string[i]===string[j]) {
+                run[1] = j;
+            }
+        }
+        if (run[1]-run[0]>longest[1]-longest[0]) {
+            longest = run;
+        }
+    }
+    return longest;
+}

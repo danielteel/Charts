@@ -1,45 +1,45 @@
 const Utils = require('./Utils');
 
 const OpObjType={
-    bool: Symbol("bool"),
-    num: Symbol("number"),
-    string: Symbol("string"),
-    register: Symbol("register")
+	bool: Symbol("bool"),
+	num: Symbol("number"),
+	string: Symbol("string"),
+	register: Symbol("register")
 };
 
 
 class OpObj {
-    constructor(name="", objType=null, value=null, isConstant=false){
+	constructor(name="", objType=null, value=null, isConstant=false){
 		this._name=name;
 		this._objType=objType;
 		this._value=value;
 		this._isConstant=isConstant;
-    }
+	}
 
-    get name(){
+	get name(){
 		return this._name;	
-    }
+	}
 
-    get objType(){
+	get objType(){
 		return this._objType;
-    }
+	}
 
-    get isConstant(){
+	get isConstant(){
 		return this._isConstant;
-    }
+	}
 
-    get value(){
+	get value(){
 		return this._value;
-    }
+	}
 }
 
 class RegisterObj extends OpObj {
-    constructor(name){
+	constructor(name){
 		super(name, OpObjType.register, null, false);
 		this._curValType=OpObjType.num;
-    }
+	}
 
-    setTo(obj){
+	setTo(obj){
 		if (obj instanceof OpObj === false) throw new Error("Tried to set register to invalid type");
 
 		if (obj._objType===OpObjType.register){
@@ -48,9 +48,9 @@ class RegisterObj extends OpObj {
 			this._curValType=obj._objType;
 		}
 		this._value=obj._value;
-    }
+	}
 
-    getNativeObj(){
+	getNativeObj(){
 		switch (this._curValType){
 		case OpObjType.string:
 			return new StringObj("",this._value, true);
@@ -59,34 +59,34 @@ class RegisterObj extends OpObj {
 		case OpObjType.num:
 			return new NumberObj("", this._value, true);
 		}
-    }
+	}
 
-    eqaulTo(obj){
+	eqaulTo(obj){
 		return this.getNativeObj().eqaulTo(obj);
-    }
-    notEqualTo(obj){
+	}
+	notEqualTo(obj){
 		return this.getNativeObj().notEqualTo(obj);
-    }
-    smallerThan(obj){
+	}
+	smallerThan(obj){
 		return this.getNativeObj().smallerThan(obj);
-    }
-    greaterThan(obj){
+	}
+	greaterThan(obj){
 		return this.getNativeObj().greaterThan(obj);
-    }
-    smallerOrEqualThan(obj){
+	}
+	smallerOrEqualThan(obj){
 		return this.getNativeObj().smallerOrEqualThan(obj);
-    }
-    greaterOrEqualThan(obj){
+	}
+	greaterOrEqualThan(obj){
 		return this.getNativeObj().greaterOrEqualThan(obj);
-    }
+	}
 }
 
 class BoolObj extends OpObj {
-    constructor(name, initialVal=false, isConstant=false){
+	constructor(name, initialVal=false, isConstant=false){
 		super(name, OpObjType.bool, Boolean(initialVal), isConstant);
-    }
+	}
 
-    setTo(obj){
+	setTo(obj){
 		if (this._isConstant)  throw new Error("Tried to write to constant bool");
 		if (obj instanceof OpObj === false) throw new Error("Tried to set bool to invalid type");
 		
@@ -103,8 +103,8 @@ class BoolObj extends OpObj {
 		default:
 			throw new Error("Tried to set bool to unknown type");
 		}
-    }
-    eqaulTo(obj){
+	}
+	eqaulTo(obj){
 		let type=obj._objType;
 		if (type===OpObjType.register) type=obj._curValType;
 
@@ -116,11 +116,11 @@ class BoolObj extends OpObj {
 		default:
 			throw new Error("Tried to do comparison to invalid type");
 		}
-    }    
-    notEqualTo(obj){
+	}    
+	notEqualTo(obj){
 		return !this.eqaulTo(obj);
-    }
-    smallerThan(obj){
+	}
+	smallerThan(obj){
 		let type=obj._objType;
 		if (type===OpObjType.register) type=obj._curValType;
 		switch (type){
@@ -131,8 +131,8 @@ class BoolObj extends OpObj {
 		default:
 			throw new Error("Tried to do comparison to invalid type");
 		}
-    }
-    greaterThan(obj){
+	}
+	greaterThan(obj){
 		let type=obj._objType;
 		if (type===OpObjType.register) type=obj._curValType;
 		switch (type){
@@ -143,21 +143,21 @@ class BoolObj extends OpObj {
 		default:
 			throw new Error("Tried to do comparison to invalid type");
 		}
-    }
-    smallerOrEqualThan(obj){
+	}
+	smallerOrEqualThan(obj){
 		return this.smallerThan(obj)||this.eqaulTo(obj);
-    }
-    greaterOrEqualThan(obj){
+	}
+	greaterOrEqualThan(obj){
 		return this.greaterThan(obj)||this.eqaulTo(obj);
-    }
+	}
 }
 
 class NumberObj extends OpObj {
-    constructor(name, initialVal=null, isConstant=false){
+	constructor(name, initialVal=null, isConstant=false){
 		super(name, OpObjType.num, Number(initialVal), isConstant);
-    }
+	}
 
-    setTo(obj){
+	setTo(obj){
 		if (this._isConstant)  throw new Error("Tried to write to constant number");
 		if (obj instanceof OpObj === false) throw new Error("Tried to set number to invalid type");
 		
@@ -174,8 +174,8 @@ class NumberObj extends OpObj {
 			default:
 				throw new Error("Tried to set number to invalid type");
 		}
-    }
-    eqaulTo(obj){
+	}
+	eqaulTo(obj){
 		let type=obj._objType;
 		if (type===OpObjType.register) type=obj._curValType;
 
@@ -187,11 +187,11 @@ class NumberObj extends OpObj {
 			default:
 				throw new Error("Tried to do comparison to invalid type");
 		}
-    }    
-    notEqualTo(obj){
+	}    
+	notEqualTo(obj){
 		return !this.eqaulTo(obj);
-    }
-    smallerThan(obj){
+	}
+	smallerThan(obj){
 		let type=obj._objType;
 		if (type===OpObjType.register) type=obj._curValType;
 		switch (type){
@@ -202,8 +202,8 @@ class NumberObj extends OpObj {
 			default:
 				throw new Error("Tried to do comparison to invalid type");
 		}
-    }
-    greaterThan(obj){
+	}
+	greaterThan(obj){
 		let type=obj._objType;
 		if (type===OpObjType.register) type=obj._curValType;
 		switch (type){
@@ -214,21 +214,21 @@ class NumberObj extends OpObj {
 			default:
 				throw new Error("Tried to do comparison to invalid type");
 		}
-    }
-    smallerOrEqualThan(obj){
+	}
+	smallerOrEqualThan(obj){
 		return this.smallerThan(obj)||this.eqaulTo(obj);
-    }
-    greaterOrEqualThan(obj){
+	}
+	greaterOrEqualThan(obj){
 		return this.greaterThan(obj)||this.eqaulTo(obj);
-    }
+	}
 }
 
 class StringObj extends OpObj {
-    constructor(name, initialVal="", isConstant=false){
+	constructor(name, initialVal="", isConstant=false){
 		super(name, OpObjType.string, String(initialVal), isConstant);
-    }
+	}
 
-    setTo(obj){
+	setTo(obj){
 		if (this._isConstant)  throw new Error("Tried to write to constant string");
 		if (obj instanceof OpObj === false) throw new Error("Tried to set string to invalid type");
 		
@@ -242,9 +242,9 @@ class StringObj extends OpObj {
 			default:
 				throw new Error("Tried to set string to invalid type");
 		}
-    }
+	}
 
-    eqaulTo(obj){
+	eqaulTo(obj){
 		let type=obj._objType;
 		if (type===OpObjType.register) type=obj._curValType;
 
@@ -254,29 +254,22 @@ class StringObj extends OpObj {
 			default:
 				throw new Error("Tried to do comparison to invalid type");
 		}
-    }    
-    notEqualTo(obj){
+	}    
+	notEqualTo(obj){
 		return !this.eqaulTo(obj);
-    }
-    smallerThan(obj){
+	}
+	smallerThan(obj){
 		throw new Error("Tried to do invalid comparison");
-    }
-    greaterThan(obj){
+	}
+	greaterThan(obj){
 		throw new Error("Tried to do invalid comparison");
-    }
-    smallerOrEqualThan(obj){
+	}
+	smallerOrEqualThan(obj){
 		throw new Error("Tried to do invalid comparison");
-    }
-    greaterOrEqualThan(obj){
+	}
+	greaterOrEqualThan(obj){
 		throw new Error("Tried to do invalid comparison");
-    }
+	}
 }
 
-
-class Machine {
-    constructor(){
-
-    }
-}
-
-module.exports={OpObjType, OpObj, RegisterObj, StringObj, NumberObj, BoolObj, Machine};
+module.exports={OpObjType, OpObj, RegisterObj, StringObj, NumberObj, BoolObj};
