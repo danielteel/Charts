@@ -36,10 +36,6 @@ class Parser {
 		this.program=null;
 	}
 
-	printLn(code){
-		this.debugCode+="\t".repeat(this.scopeIndex+this.allocScopeIndex)+code+'\n';
-	}
-
 	newBranch(){
 		return this.branchCounter++;
 	}
@@ -56,7 +52,6 @@ class Parser {
 		this.errorObj = Utils.newErrorObj(this.token?.line, message);
 		return false;
 	}
-
 
 	isNotEnd() {
 		return this.tokenIndex < this.tokenEndIndex;
@@ -81,27 +76,23 @@ class Parser {
 		const pushGlobalScopeBranch = this.newBranch();
 		const comeBackBranch = this.newBranch();
 
-		//this.printLn("jmp ["+pushGlobalScopeBranch+"]");
-		//this.printLn("["+comeBackBranch+"]");
 		this.program.addJmp(pushGlobalScopeBranch);
 		this.program.addLabel(comeBackBranch);
 
 		if (!this.doBlock(null, null, false, false, true)){
 			//report default error message
 		}
-
-		//this.printLn("["+pushGlobalScopeBranch+"]");
+		this.program.addExit( Program.unlinkedNilLiteral() );
 		this.program.addLabel(pushGlobalScopeBranch);
 
 		if (this.allocScope[this.allocScopeIndex]){
-			//this.printLn("pushScope "+this.allocScopeIndex+", "+this.allocScope[this.allocScopeIndex]);
 			this.program.addPushScope(this.allocScopeIndex, this.allocScope[this.allocScopeIndex]);
 		}
-		//this.printLn("jmp ["+comeBackBranch+"]");
 		this.program.addJmp(comeBackBranch);
 
 		this.popAllocScope();
-		return this.errorObj;
+		if (this.errorObj) return this.errorObj;
+		return this.program;
 	}
 	
 	pushAllocScope(){
@@ -214,7 +205,6 @@ class Parser {
 		if (!this.match(TokenType.LeftParen)) return false;
 		if (!this.doExpression()) return false;
 
-		//this.printLn("ceil eax");
 		this.program.addCeil( Program.unlinkedReg("eax") );
 
 		return this.match(TokenType.RightParen);
@@ -225,7 +215,6 @@ class Parser {
 		if (!this.match(TokenType.LeftParen)) return false;
 		if (!this.doExpression()) return false;
 
-		//this.printLn("floor eax");
 		this.program.addFloor( Program.unlinkedReg("eax") );
 
 		return this.match(TokenType.RightParen);
@@ -236,7 +225,6 @@ class Parser {
 		if (!this.match(TokenType.LeftParen)) return false;
 		if (!this.doExpression()) return false;
 
-		//this.printLn("abs eax");
 		this.program.addAbs( Program.unlinkedReg("eax") );
 
 		return this.match(TokenType.RightParen);
@@ -247,14 +235,11 @@ class Parser {
 		if (!this.match(TokenType.LeftParen)) return false;
 		if (!this.doExpression()) return false;
 
-		//this.printLn("push eax");
 		this.program.addPush( Program.unlinkedReg("eax") );
 
 		if (!this.match(TokenType.Comma)) return false;
 		if (!this.doExpression()) return false;
 
-		//this.printLn("pop ebx");
-		//this.printLn("min eax, ebx");
 		this.program.addPop( Program.unlinkedReg("ebx") );
 		this.program.addMin( Program.unlinkedReg("eax"), Program.unlinkedReg("ebx") );
 
@@ -266,14 +251,11 @@ class Parser {
 		if (!this.match(TokenType.LeftParen)) return false;
 		if (!this.doExpression()) return false;
 
-		//this.printLn("push eax");
 		this.program.addPush( Program.unlinkedReg("eax") );
 
 		if (!this.match(TokenType.Comma)) return false;
 		if (!this.doExpression()) return false;
 
-		//this.printLn("pop ebx");
-		//this.printLn("max eax, ebx");
 		this.program.addPop( Program.unlinkedReg("ebx") );
 		this.program.addMax( Program.unlinkedReg("eax"), Program.unlinkedReg("ebx") );
 
@@ -285,15 +267,11 @@ class Parser {
 		if (!this.match(TokenType.LeftParen)) return false;
 		if (!this.doExpression()) return false;
 
-		//this.printLn("push eax");
 		this.program.addPush( Program.unlinkedReg("eax") );
 
 		if (!this.match(TokenType.Comma)) return false;
 		if (!this.doExpression()) return false;
 
-		// this.printLn("pop ebx");
-		// this.printLn("max eax, ebx");
-		// this.printLn("push eax");
 		this.program.addPop( Program.unlinkedReg("ebx") );
 		this.program.addMax( Program.unlinkedReg("eax"), Program.unlinkedReg("ebx") );
 		this.program.addPush( Program.unlinkedReg("eax") );
@@ -301,8 +279,6 @@ class Parser {
 		if (!this.match(TokenType.Comma)) return false;
 		if (!this.doExpression()) return false;
 
-		//this.printLn("pop ebx");
-		//this.printLn("min eax, ebx");
 		this.program.addPop( Program.unlinkedReg("ebx") );
 		this.program.addMin( Program.unlinkedReg("eax"), Program.unlinkedReg("ebx") );
 
@@ -336,7 +312,6 @@ class Parser {
 					return this.setError("Invalid data type in function call parameter list "+identObj.params[i].toString());
 			}
 			
-			//this.printLn("push eax");
 			this.program.addPush( Program.unlinkedReg("eax") );
 
 			if (i<identObj.params.length-1){
@@ -346,10 +321,8 @@ class Parser {
 
 		if (!this.match(TokenType.RightParen)) return false;
 		if (identObj.scope===0){
-			//this.printLn("excall "+identObj.index+" //"+funcName);//external function
 			this.program.addExCall(identObj.index);
 		}else{
-			//this.printLn("call ["+identObj.branch+"] //"+funcName);//internal function
 			this.program.addCall(identObj.branch);
 		}
 		return true;
@@ -362,12 +335,10 @@ class Parser {
 
 		switch (identObj.type){
 			case IdentityType.Double:
-				//this.printLn("mov eax, ["+identObj.scope+"]["+identObj.index+"] // "+varName);
 				this.program.addMov( Program.unlinkedReg("eax"), Program.unlinkedDouble(identObj.scope, identObj.index) );
 				return this.match(TokenType.Ident);
 
 			case IdentityType.Bool:
-				//this.printLn("mov eax, ["+identObj.scope+"]["+identObj.index+"] // "+varName);
 				this.program.addMov( Program.unlinkedReg("eax"), Program.unlinkedBool(identObj.scope, identObj.index) );
 				return this.match(TokenType.Ident);
 
@@ -384,7 +355,6 @@ class Parser {
 		if (!this.match(TokenType.LeftParen)) return false;
 		if (!this.doStringExpression()) return false;
 
-		//this.printLn("todouble eax");
 		this.program.addToDouble( Program.unlinkedReg("eax") );
 
 		return this.match(TokenType.RightParen)
@@ -396,7 +366,6 @@ class Parser {
 		if (!this.match(TokenType.LeftParen)) return false;
 		if (!this.doStringExpression()) return false;
 
-		//this.printLn("len eax");
 		this.program.addLen( Program.unlinkedReg("eax") );
 
 		return this.match(TokenType.RightParen);
@@ -406,14 +375,11 @@ class Parser {
 		if (!this.match(TokenType.LeftParen)) return false;
 		if (!this.doStringExpression()) return false;
 		
-		//this.printLn("push eax");
 		this.program.addPush( Program.unlinkedReg("eax") );
 
 		if (!this.match(TokenType.Comma)) return false;
 		if (!this.doStringExpression()) return false;
 		
-		//this.printLn("pop ebx");
-		//this.printLn("strcmp eax, ebx");
 		this.program.addPop( Program.unlinkedReg("ebx") );
 		this.program.addStrCmp( Program.unlinkedReg("eax"), Program.unlinkedReg("ebx") );
 		
@@ -424,14 +390,11 @@ class Parser {
 		if (!this.match(TokenType.LeftParen)) return false;
 		if (!this.doStringExpression()) return false;
 		
-		//this.printLn("push eax");
 		this.program.addPush( Program.unlinkedReg("eax") );
 
 		if (!this.match(TokenType.Comma)) return false;
 		if (!this.doStringExpression()) return false;
 
-		//this.printLn("pop ebx");
-		//this.printLn("stricmp eax, ebx");
 		this.program.addPop( Program.unlinkedReg("ebx") );
 		this.program.addStrICmp( Program.unlinkedReg("eax"), Program.unlinkedReg("ebx") );
 
@@ -442,7 +405,6 @@ class Parser {
 		switch (this.token.type){        
 		case TokenType.DoubleLiteral:
 
-			//this.printLn("mov eax, "+this.token.value);
 			this.program.addMov( Program.unlinkedReg("eax"), Program.unlinkedDoubleLiteral(this.token.value) );
 
 			return this.match(TokenType.DoubleLiteral);
@@ -460,7 +422,6 @@ class Parser {
 			if (!this.match(TokenType.Not)) return false;
 			if (!this.doFactor()) return false;
 
-			//this.printLn("not eax");
 			this.program.addNot( Program.unlinkedReg("eax") );
 			return true;
 
@@ -468,22 +429,18 @@ class Parser {
 			if (!this.match(TokenType.Minus)) return false;
 			if (!this.doFactor()) return false;
 
-			//this.printLn("neg eax");
 			this.program.addNeg( Program.unlinkedReg("eax") );
 			return true;
 			
 		case TokenType.Nil:
-			//this.printLn("mov eax, nil")
-			this.program.addMov( Program.unlinkedReg("eax"), Program.unlinkedNiLiteral() );
+			this.program.addMov( Program.unlinkedReg("eax"), Program.unlinkedNilLiteral() );
 			return this.match(TokenType.Nil);
 
 		case TokenType.True:
-			//this.printLn("mov eax, true");
 			this.program.addMov( Program.unlinkedReg("eax"), Program.unlinkedBoolLiteral(true) );
 			return this.match(TokenType.True);
 
 		case TokenType.False:
-			//this.printLn("mov eax, false");
 			this.program.addMov( Program.unlinkedReg("eax"), Program.unlinkedBoolLiteral(false) );
 			return this.match(TokenType.False);    
 
@@ -518,7 +475,6 @@ class Parser {
 		if (!this.doFactor()) return false;
 		while (this.isPowerOp()){
 
-			//this.printLn("push eax");
 			this.program.addPush( Program.unlinkedReg("eax") );
 
 			switch (this.token.type){
@@ -526,9 +482,6 @@ class Parser {
 					if (!this.match(TokenType.Exponent)) return false;
 					if (!this.doFactor()) return false;
 
-					// this.printLn("mov ebx, eax");
-					// this.printLn("pop eax");
-					// this.printLn("exp eax, ebx");
 					this.program.addMov( Program.unlinkedReg("ebx"), Program.unlinkedReg("eax") );
 					this.program.addPop( Program.unlinkedReg("eax") );
 					this.program.addExponent( Program.unlinkedReg("eax"), Program.unlinkedReg("ebx") );
@@ -541,24 +494,18 @@ class Parser {
 	doTerm(){
 		if (!this.doPower()) return false;
 		while (this.isTermOp()){
-			//this.printLn("push eax");
 			this.program.addPush( Program.unlinkedReg("eax") );
 
 			switch (this.token.type){
 			case TokenType.Multiply:
 				if (!this.match(TokenType.Multiply)) return false;
 				if (!this.doPower()) return false;
-				//this.printLn("pop ebx");
-				//this.printLn("mul eax, ebx");
 				this.program.addPop( Program.unlinkedReg("ebx"));
 				this.program.addMul( Program.unlinkedReg("eax"), Program.unlinkedReg("ebx") );
 				break;
 			case TokenType.Divide:
 				if (!this.match(TokenType.Divide)) return false;
 				if (!this.doPower()) return false;
-				// this.printLn("mov ebx, eax");
-				// this.printLn("pop eax");
-				// this.printLn("div eax, ebx");
 				this.program.addMov( Program.unlinkedReg("ebx"), Program.unlinkedReg("eax") );
 				this.program.addPop( Program.unlinkedReg("eax"));
 				this.program.addDiv( Program.unlinkedReg("eax"), Program.unlinkedReg("ebx") );
@@ -566,9 +513,6 @@ class Parser {
 			case TokenType.Mod:
 				if (!this.match(TokenType.Mod)) return false;
 				if (!this.doPower()) return false;
-				// this.printLn("mov ebx, eax");
-				// this.printLn("pop eax");
-				// this.printLn("mod eax, ebx");
 				this.program.addMov( Program.unlinkedReg("ebx"), Program.unlinkedReg("eax") );
 				this.program.addPop( Program.unlinkedReg("eax"));
 				this.program.addMod( Program.unlinkedReg("eax"), Program.unlinkedReg("ebx") );
@@ -578,25 +522,24 @@ class Parser {
 		return true;
 	}
 
-	doAdd(){//TODO get it
+	doAdd(){
 		if (!this.doTerm()) return false;
 		while (this.isAddOp()){
-			//this.printLn("push eax");
 			this.program.addPush( Program.unlinkedReg("eax") );
 
 			switch (this.token.type){
 			case TokenType.Plus:
 				if (!this.match(TokenType.Plus)) return false;
 				if (!this.doTerm()) return false;
-				this.printLn("pop ebx");
-				this.printLn("add eax, ebx");
+				this.program.addPop( Program.unlinkedReg("ebx") );
+				this.program.addAdd( Program.unlinkedReg("eax"), Program.unlinkedReg("ebx") );
 				break;
 			case TokenType.Minus:
 				if (!this.match(TokenType.Minus)) return false;
 				if (!this.doTerm()) return false;
-				this.printLn("pop ebx");
-				this.printLn("sub eax, ebx");
-				this.printLn("neg eax");
+				this.program.addPop( Program.unlinkedReg("ebx") );
+				this.program.addSub( Program.unlinkedReg("eax"), Program.unlinkedReg("ebx") );
+				this.program.addNeg( Program.unlinkedReg("eax") );
 				break;
 			}
 		}
@@ -607,33 +550,33 @@ class Parser {
 		if (!this.doAdd()) return false;
 		while (this.isCompareOp()){
 
-			//this.printLn("push eax");
 			this.program.addPush( Program.unlinkedReg("eax") );
 			
 			let compareType=this.token.type;
 			if (!this.match(compareType)) return false;
 			if (!this.doAdd()) return false;
 			
-			this.printLn("pop ebx");
-			this.printLn("cmp ebx, eax");
+			this.program.addPop( Program.unlinkedReg("ebx") );
+			this.program.addCmp( Program.unlinkedReg("ebx"), Program.unlinkedReg("eax") );
+
 			switch (compareType){
 			case TokenType.Equals:
-				this.printLn("se eax");
+				this.program.addSE( Program.unlinkedReg("eax") );
 				break;
 			case TokenType.NotEquals:
-				this.printLn("sne eax");
+				this.program.addSNE( Program.unlinkedReg("eax") );
 				break;
 			case TokenType.Greater:
-				this.printLn("sa eax");
+				this.program.addSA( Program.unlinkedReg("eax") );
 				break;
 			case TokenType.GreaterEquals:
-				this.printLn("sae eax");
+				this.program.addSAE( Program.unlinkedReg("eax") );
 				break;
 			case TokenType.Lesser:
-				this.printLn("sb eax");
+				this.program.addSB( Program.unlinkedReg("eax") );
 				break;
 			case TokenType.LesserEquals:
-				this.printLn("sbe eax");
+				this.program.addSBE( Program.unlinkedReg("eax") );
 				break;
 			}
 		}
@@ -646,15 +589,14 @@ class Parser {
 		
 		while (this.isAndOp()){
 
-			//this.printLn("push eax");
 			this.program.addPush( Program.unlinkedReg("eax") );
 			
 			if (this.token.type===TokenType.And){
 				if (!this.match(TokenType.And)) return false;
 				if (!this.doCompare()) return false;
 				
-				this.printLn("pop ebx");
-				this.printLn("and eax, ebx");
+				this.program.addPop( Program.unlinkedReg("ebx") );
+				this.program.addAnd( Program.unlinkedReg("eax"), Program.unlinkedReg("ebx") );
 			}
 		}
 		return true;
@@ -665,14 +607,13 @@ class Parser {
 		
 		while (this.isOrOp()){
 
-			//this.printLn("push eax");
 			this.program.addPush( Program.unlinkedReg("eax") );
 
 			if (this.token.type===TokenType.Or){
 				if (!this.match(TokenType.Or)) return false;
 				if (!this.doAnd()) return false;
-				this.printLn("pop ebx");
-				this.printLn("or eax, ebx");
+				this.program.addPop( Program.unlinkedReg("ebx") );
+				this.program.addOr( Program.unlinkedReg("eax"), Program.unlinkedReg("ebx") );
 			}
 		}
 		
@@ -687,7 +628,7 @@ class Parser {
 
 		switch (identObj.type){
 			case IdentityType.String:
-				this.printLn("mov eax, ["+identObj.scope+"]["+identObj.index+"] // "+varName);
+				this.program.addMov( Program.unlinkedReg("eax"), Program.unlinkedString(identObj.scope, identObj.index) )
 				return this.match(TokenType.Ident);
 
 			case IdentityType.StringFunction:
@@ -700,41 +641,44 @@ class Parser {
 		if (!this.match(TokenType.LCase)) return false;
 		if (!this.match(TokenType.LeftParen)) return false;
 		if (!this.doStringExpression()) return false;
-		this.printLn("lcase eax");
+		this.program.addLCase( Program.unlinkedReg("eax") );
+
 		return this.match(TokenType.RightParen);
 	}
 	doUCase(){
 		if (!this.match(TokenType.UCase)) return false;
 		if (!this.match(TokenType.LeftParen)) return false;
 		if (!this.doStringExpression()) return false;
-		this.printLn("ucase eax");
+		this.program.addUCase( Program.unlinkedReg("eax") );
+
 		return this.match(TokenType.RightParen);
 	}
 	doTrim(){
 		if (!this.match(TokenType.Trim)) return false;
 		if (!this.match(TokenType.LeftParen)) return false;
 		if (!this.doStringExpression()) return false;
-		this.printLn("trim eax");
+		this.program.addTrim( Program.unlinkedReg("eax") );
+
 		return this.match(TokenType.RightParen);
 	}
 	doSubStr(){
 		if (!this.match(TokenType.SubStr)) return false;
 		if (!this.match(TokenType.LeftParen)) return false;
 		if (!this.doStringExpression()) return false;
-		//this.printLn("push eax");
 		this.program.addPush( Program.unlinkedReg("eax") );
+
 		if (!this.match(TokenType.Comma)) return false;
 		if (!this.doExpression()) return false;
-		//this.printLn("push eax");
 		this.program.addPush( Program.unlinkedReg("eax") );
+
 		if (!this.match(TokenType.Comma)) return false;
 		if (!this.doExpression()) return false;
-		//this.printLn("push eax");
 		this.program.addPush( Program.unlinkedReg("eax") );
-		this.printLn("mov ecx, eax");
-		this.printLn("pop ebx");
-		this.printLn("pop eax");
-		this.printLn("substr eax, ebx, ecx");
+		this.program.addMov( Program.unlinkedReg("ecx"), Program.unlinkedReg("eax") );
+		this.program.addPop( Program.unlinkedReg("ebx") );
+		this.program.addPop( Program.unlinkedReg("eax") );
+		this.program.addSubStr( Program.unlinkedReg("eax"), Program.unlinkedReg("ebx"), Program.unlinkedReg("ecx") );
+
 		return this.match(TokenType.RightParen);
 	}
 	doToString(){ 
@@ -742,14 +686,13 @@ class Parser {
 		if (!this.match(TokenType.LeftParen)) return false;
 		if (!this.doExpression()) return false;
 
-		//this.printLn("push eax");
 		this.program.addPush( Program.unlinkedReg("eax") );
 
 		if (!this.match(TokenType.Comma)) return false;
 		if (!this.doExpression()) return false;
-		this.printLn("mov ebx, eax");
-		this.printLn("pop eax");
-		this.printLn("tostring eax, ebx");
+		this.program.addMov( Program.unlinkedReg("ebx"), Program.unlinkedReg("eax") );
+		this.program.addPop( Program.unlinkedReg("eax") );
+		this.program.addToString( Program.unlinkedReg("eax"), Program.unlinkedReg("ebx") );
 		return this.match(TokenType.RightParen);
 	}
 
@@ -783,7 +726,7 @@ class Parser {
 	doStringFactor(){
 		switch (this.token.type){
 			case TokenType.StringLiteral:
-				this.printLn("load eax, "+this.getFromStringPool(this.token.value));
+				this.program.addMov( Program.unlinkedReg("eax"), Program.unlinkedStringLiteral(this.token.value) );
 				return this.match(TokenType.StringLiteral);
 			case TokenType.Ident:
 				return this.doStringExpressionIdent();
@@ -805,16 +748,14 @@ class Parser {
 		if (!this.doStringFactor()) return false;
 		
 		while (this.token.type===TokenType.Plus){
-			//this.printLn("push eax");
 			this.program.addPush( Program.unlinkedReg("eax") );
 			
 			if (!this.match(TokenType.Plus)) return false;
 			if (!this.doStringFactor()) return false;
-			this.printLn("pop ebx");
-			this.printLn("concat ebx, eax");
-			this.printLn("mov eax, ebx");
+			this.program.addPop( Program.unlinkedReg("ebx") );
+			this.program.addConcat( Program.unlinkedReg("ebx"), Program.unlinkedReg("eax") );
+			this.program.addMov( Program.unlinkedReg("eax"), Program.unlinkedReg("ebx") );
 		}
-		
 		return true;
 	}
 
@@ -829,30 +770,29 @@ class Parser {
 
 	doIf(breakToBranch, returnToBranch, returnType){
 		const elseLabel = this.newBranch();
-		const endLabel = this.newBranch();
 		if (!this.match(TokenType.If)) return false;
 
 		if (!this.match(TokenType.LeftParen)) return false;
 		if (!this.doExpression()) return false;
 		if (!this.match(TokenType.RightParen)) return false;
 
-		this.printLn("test eax, eax");
-		this.printLn("je "+elseLabel);
+		this.program.addTest( Program.unlinkedReg("eax") );
+		this.program.addJE( elseLabel );
 
 		if (!this.doBlock(breakToBranch, returnToBranch, false, true, false, returnType)) return false;
 
-
 		if (this.token.type === TokenType.Else) {
-			this.printLn("jmp "+endLabel);
-			this.printLn(elseLabel+":");
+			const endLabel = this.newBranch();
+			this.program.addJmp( endLabel );
+			this.program.addLabel( elseLabel );
 
 			if (!this.match(TokenType.Else)) return false;
 			
 			if (!this.doBlock(breakToBranch, returnToBranch, false, true, false, returnType)) return false;
 			
-			this.printLn(endLabel+":");
+			this.program.addLabel( endLabel );
 		}else{
-			this.printLn(elseLabel+":");
+			this.program.addLabel( elseLabel );
 		}
 		
 		return true;
@@ -864,19 +804,19 @@ class Parser {
 		
 		if (!this.match(TokenType.While)) return false;
 
-		this.printLn(loopLabel+":");
+		this.program.addLabel( loopLabel );
 
 		if (!this.match(TokenType.LeftParen)) return false;
 		if (!this.doExpression()) return false;
 		if (!this.match(TokenType.RightParen)) return false;
 		
-		this.printLn("test eax");
-		this.printLn("je "+endLabel);
+		this.program.addTest( Program.unlinkedReg("eax") );
+		this.program.addJE( endLabel );
 
 		if (!this.doBlock(endLabel, returnToBranch, false, true, false, returnType)) return false;
 		
-		this.printLn("jmp "+loopLabel);
-		this.printLn(endLabel+":");
+		this.program.addJmp( loopLabel );
+		this.program.addLabel( endLabel );
 
 		return true;
 	}
@@ -911,16 +851,16 @@ class Parser {
 			if (!this.match(TokenType.LineDelim)) return false;//               ;
 		}
 
-		this.printLn("[cmp"+compareLabel+"]");
+		this.program.addLabel( compareLabel );
 
 		if (this.token.type!==TokenType.LineDelim){//                           [expression]
 			if (!this.doExpression()) return false;
-			this.printLn("test eax");
-			this.printLn("je [end"+endLabel+"]");
+			this.program.addTest( Program.unlinkedReg("eax") );
+			this.program.addJE( endLabel );
 		}
 		
-		this.printLn("jmp [blk"+blockLabel+"]");
-		this.printLn("[inc"+incLabel+"]");
+		this.program.addJmp( blockLabel );
+		this.program.addLabel( incLabel );
 
 		if (!this.match(TokenType.LineDelim)) return false;//                   ;
 
@@ -928,16 +868,16 @@ class Parser {
 			if (!this.doAssignment(false)) return false;
 		}
 
-		this.printLn("jmp [cmp"+compareLabel+"]");
+		this.program.addJmp( compareLabel );
 
 		if (!this.match(TokenType.RightParen)) return false;//                  )
 
-		this.printLn("[blk"+blockLabel+"]");
+		this.program.addLabel( blockLabel );
 
 		if (!this.doBlock(endLabel, returnToBranch, false, true, false, returnType)) return false;//{ block }
 
-		this.printLn("jmp [inc"+incLabel+"]");
-		this.printLn("[end"+endLabel+"]");
+		this.program.addJmp( incLabel );
+		this.program.addLabel( endLabel );
 
 		this.popScope();
 
@@ -948,7 +888,7 @@ class Parser {
 		const loopLabel = this.newBranch();
 		const endLabel = this.newBranch();
 
-		this.printLn(loopLabel+":");
+		this.program.addLabel( loopLabel );
 
 		if (!this.match(TokenType.Loop)) return false;
 
@@ -959,9 +899,9 @@ class Parser {
 		if (!this.doExpression()) return false;
 		if (!this.match(TokenType.RightParen)) return false;
 		
-		this.printLn("test eax");
-		this.printLn("jne "+loopLabel);
-		this.printLn(endLabel+":");
+		this.program.addTest( Program.unlinkedReg("eax") );
+		this.program.addJNE( loopLabel );
+		this.program.addLabel( endLabel );
 
 		return true;
 	}
@@ -969,7 +909,8 @@ class Parser {
 	doBreak(breakToBranch){
 		if (!this.match(TokenType.Break)) return false;
 		if (breakToBranch===null || breakToBranch===undefined) return this.setError("No loop to break from.");
-		this.printLn("jmp "+breakToBranch);
+		this.program.addJmp( breakToBranch );
+
 		return this.match(TokenType.LineDelim);
 	}
 
@@ -977,9 +918,9 @@ class Parser {
 		if (!this.match(TokenType.Exit)) return false;
 		if (this.token.type !== TokenType.LineDelim){
 			if (!this.doEitherExpression()) return false;
-			this.printLn("exit eax");
+			this.program.addExit( Program.unlinkedReg("eax") );
 		}else{
-			this.printLn("exit nil");
+			this.program.addExit( Program.unlinkedNilLiteral() );
 		}
 		return this.match(TokenType.LineDelim);
 	}
@@ -998,14 +939,12 @@ class Parser {
 			let identObj = this.addDouble(doubleName);
 			if (!identObj) return false;
 
-			this.printLn("double ["+identObj.scope+"]["+identObj.index+"] // "+doubleName);
+			this.program.addDouble( Program.unlinkedDouble(identObj.scope, identObj.index) );
 
 			if (this.token.type===TokenType.Assignment){
 				if (!this.match(TokenType.Assignment)) return false;
 				if (!this.doExpression()) return false;
-				this.printLn("mov ["+identObj.scope+"]["+identObj.index+"], eax // "+doubleName);
-			}else{
-				this.printLn("mov ["+identObj.scope+"]["+identObj.index+"], nil // "+doubleName);
+				this.program.addMov( Program.unlinkedDouble(identObj.scope, identObj.index), Program.unlinkedReg("eax") );
 			}
 
 			if (this.token.type===TokenType.Comma){
@@ -1029,14 +968,12 @@ class Parser {
 			let identObj = this.addBool(doubleName);
 			if (!identObj) return false;
 			
-			this.printLn("bool ["+identObj.scope+"]["+identObj.index+"] // "+boolName);
+			this.program.addBool( Program.unlinkedBool(identObj.scope, identObj.index) );
 
 			if (this.token.type===TokenType.Assignment){
 				if (!this.match(TokenType.Assignment)) return false;
 				if (!this.doExpression()) return false;
-				this.printLn("mov ["+identObj.scope+"]["+identObj.index+"], eax // "+boolName);
-			}else{
-				this.printLn("mov ["+identObj.scope+"]["+identObj.index+"], nil // "+boolName);
+				this.program.addMov( Program.unlinkedBool(identObj.scope, identObj.index), Program.unlinkedReg("eax") );
 			}
 
 			if (this.token.type===TokenType.Comma){
@@ -1060,14 +997,12 @@ class Parser {
 			let identObj = this.addString(stringName);
 			if (!identObj) return false;
 
-			this.printLn("string ["+identObj.scope+"]["+identObj.index+"] // "+stringName);
+			this.program.addString( Program.unlinkedString(identObj.scope, identObj.index) );
 
 			if (this.token.type===TokenType.Assignment){
 				if (!this.match(TokenType.Assignment)) return false;
 				if (!this.doStringExpression()) return false;
-				this.printLn("mov ["+identObj.scope+"]["+identObj.index+"], eax // "+stringName);
-			}else{
-				this.printLn("mov ["+identObj.scope+"]["+identObj.index+"], nil // "+stringName);
+				this.program.addMov( Program.unlinkedString(identObj.scope, identObj.index), Program.unlinkedReg("eax") );
 			}
 
 			if (this.token.type===TokenType.Comma){
@@ -1083,12 +1018,11 @@ class Parser {
 		const setupStackFrameBranch = this.newBranch();
 		const funcBlockBranch = this.newBranch();
 
-		this.printLn("jmp ["+skipFuncBranch+"]");
+		this.program.addJmp( skipFuncBranch );
 
 		this.pushAllocScope();
-		this.printLn("jmp ["+setupStackFrameBranch+"] //function "+name);
-
-		this.printLn("["+funcBlockBranch+"]");
+		this.program.addJmp( setupStackFrameBranch );
+		this.program.addLabel( funcBlockBranch );
 
 		let paramTypes=[];
 		let paramIdents=[];
@@ -1152,37 +1086,35 @@ class Parser {
 
 		this.popScope();
 
-		this.printLn("mov eax, nil");
-		this.printLn("["+returnToBranch+"]");
-		this.printLn("popScope "+this.allocScopeIndex);
-		this.printLn("ret");
-
-		this.printLn("["+setupStackFrameBranch+"]");
-		this.printLn("pushScope "+this.allocScopeIndex+", "+this.allocScope[this.allocScopeIndex]);
-
+		this.program.addMov( Program.unlinkedReg("eax"), Program.unlinkedNilLiteral() );
+		this.program.addLabel( returnToBranch );
+		this.program.addPopScope( this.allocScopeIndex );
+		this.program.addRet();
+		this.program.addLabel( setupStackFrameBranch );
+		this.program.addPushScope( this.allocScopeIndex, this.allocScope[this.allocScopeIndex] );
 
 		for (let i=paramObjs.length-1;i>=0;i--){
-			let typeName="";
 			switch (paramObjs[i].type){
 			case IdentityType.Bool:
-				typeName="bool";
+				this.program.addBool( Program.unlinkedBool(paramObjs[i].scope, paramObjs[i].index) );
+				this.program.addPop( Program.unlinkedBool(paramObjs[i].scope, paramObjs[i].index) );
 				break;
 			case IdentityType.Double:
-				typeName="double";
+				this.program.addDouble( Program.unlinkedDouble(paramObjs[i].scope, paramObjs[i].index) );
+				this.program.addPop( Program.unlinkedDouble(paramObjs[i].scope, paramObjs[i].index) );
 				break;
 			case IdentityType.String:
-				typeName="string";
+				this.program.addString( Program.unlinkedString(paramObjs[i].scope, paramObjs[i].index) );
+				this.program.addPop( Program.unlinkedString(paramObjs[i].scope, paramObjs[i].index) );
 				break;
 			}
-			this.printLn(typeName+" ["+paramObjs[i].scope+"]["+paramObjs[i].index+"]// "+paramObjs[i].name);
-			this.printLn("pop ["+paramObjs[i].scope+"]["+paramObjs[i].index+"]// "+paramObjs[i].name);
 		}
 
-		this.printLn("jmp ["+funcBlockBranch+"]");
+		this.program.addJmp( funcBlockBranch );
 
 		this.popAllocScope();
 
-		this.printLn("["+skipFuncBranch+"]");
+		this.program.addLabel( skipFuncBranch );
 
 		return true;
 	}
@@ -1202,9 +1134,9 @@ class Parser {
 					return this.setError("Expected return type of "+returnType.toString());
 			}
 		}else{
-			this.printLn("mov eax, nil");
+			this.program.addMov( Program.unlinkedReg("eax"), Program.unlinkedNilLiteral() );
 		}
-		this.printLn("jmp ["+returnToBranch+"]");
+		this.program.addJmp( returnToBranch );
 		return this.match(TokenType.LineDelim);
 	}
 	
@@ -1220,15 +1152,19 @@ class Parser {
 		switch (identObj.type){
 			case IdentityType.String:
 				if (!this.doStringExpression()) return false;
+				this.program.addMov( Program.unlinkedString(identObj.scope, identObj.index), Program.unlinkedReg("eax") );
 				break;
 			case IdentityType.Double:
+				if (!this.doExpression()) return false;
+				this.program.addMov( Program.unlinkedDouble(identObj.scope, identObj.index), Program.unlinkedReg("eax") );
+				break;
 			case IdentityType.Bool:
 				if (!this.doExpression()) return false;
+				this.program.addMov( Program.unlinkedBool(identObj.scope, identObj.index), Program.unlinkedReg("eax") );
 				break;
 			default:
 				return this.setError("Tried to do assignment to invalid type");
 		}
-		this.printLn("mov ["+identObj.scope+"]["+identObj.index+"], eax // "+varName);
 
 		if (wantsDelim===true) return this.match(TokenType.LineDelim);
 		return true;

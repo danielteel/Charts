@@ -83,7 +83,7 @@ class Program {
 	static unlinkedDoubleLiteral(value){ 	return {type: UnlinkedType.doubleLiteral,	value: Number(value)}; }
 	static unlinkedBoolLiteral(value){ 		return {type: UnlinkedType.boolLiteral,		value: Boolean(value)}; }
 	static unlinkedStringLiteral(value){ 	return {type: UnlinkedType.stringLiteral,	value: String(value)};}
-	static unlinkedNiLiteral(){				return {type: UnlinkedType.nilLiteral}; }
+	static unlinkedNilLiteral(){			return {type: UnlinkedType.nilLiteral}; }
 
 	constructor(){
 		this.clear();
@@ -98,7 +98,6 @@ class Program {
 		this.eax=new RegisterObj("eax");
 		this.ebx=new RegisterObj("ebx");
 		this.ecx=new RegisterObj("ecx");
-
 		this.true=new BoolObj("true", true, true);
 		this.false=new BoolObj("false", false, true);
 
@@ -157,7 +156,6 @@ class Program {
 	addMod          (obj0, obj1)		{ this.code.push( {type: OpCode.mod,		obj0: obj0, obj1: obj1} ); }
 	addExponent     (obj0, obj1)		{ this.code.push( {type: OpCode.exponent,	obj0: obj0, obj1: obj1} ); }
 	addPushScope    (scope, size)		{ this.code.push( {type: OpCode.pushscope,	scope: scope, size: size} ); }
-	addLoad         (obj0, index)		{ this.code.push( {type: OpCode.load,		obj0: obj0, index: index} ); }
 	addSubStr       (obj0, obj1, obj2)	{ this.code.push( {type: OpCode.substr,		obj0: obj0, obj1: obj1, obj2: obj2} ); }
 	addClamp        (obj0, obj1, obj2)	{ this.code.push( {type: OpCode.clamp,		obj0: obj0, obj1: obj1, obj2: obj2} ); }
 }

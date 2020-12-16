@@ -25,7 +25,7 @@ class Interpreter {
             console.log("Error during parse on line: "+errorRecvd.line+" "+errorRecvd.message);
             return errorRecvd;
         }
-        console.log(parser.debugCode);
+        console.log(parser.program.code);
         return null;
     }
 }
@@ -49,19 +49,3 @@ console.log(a.runCode(` bool isLegalDrinker(double age){
                         `));
 module.exports=Interpreter;
 
-
-function longestRun(string) {
-    let longest=[0, 0];
-    for (let i=0; i < string.length; i++) {
-        var run=[i, i];
-        for (let j=i+1; j<string.length; j++) {
-            if (string[i]===string[j]) {
-                run[1] = j;
-            }
-        }
-        if (run[1]-run[0]>longest[1]-longest[0]) {
-            longest = run;
-        }
-    }
-    return longest;
-}
