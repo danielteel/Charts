@@ -3,10 +3,17 @@ const {OpObjType, OpObj, RegisterObj, StringObj, NumberObj, BoolObj, Machine}=re
 
 const Tokenizer = require('./Tokenizer');
 const {Parser, IdentityType} = require('./Parser');
+const {Program} = require('./Program');
 
 
 class Interpreter {
     constructor(){
+    }
+
+    print(popFn){
+        let stringObj=popFn();
+
+        console.log(stringObj.value);
     }
 
     runCode(code){
@@ -19,13 +26,21 @@ class Interpreter {
         }
 
         let parser=new Parser(tokenizer.tokens);
-        errorRecvd=parser.parse([ {name: "age", type: IdentityType.Double}, {name: "print", type: IdentityType.BoolFunction, params:[IdentityType.String]} ]);
-
-        if (errorRecvd!==null){
+        const program=parser.parse([ {name: "age", type: IdentityType.Double}, {name: "print", type: IdentityType.BoolFunction, params:[IdentityType.String]} ]);
+        if (!(program instanceof Program)){
+            errorRecvd = program;
             console.log("Error during parse on line: "+errorRecvd.line+" "+errorRecvd.message);
             return errorRecvd;
         }
-        console.log(parser.program.code);
+
+        errorRecvd=program.link();
+        if (errorRecvd){
+            console.log("Error during link: "+errorRecvd.line+" "+errorRecvd.message);
+            return errorRecvd;
+        }
+
+        program.execute([new NumberObj("age", 18, false), this.print]);
+
         return null;
     }
 }
@@ -33,6 +48,7 @@ class Interpreter {
 
 
 let a=new Interpreter();
+
 console.log(a.runCode(` bool isLegalDrinker(double age){
                             if (age>=21) return true;
                             return false;

@@ -21,17 +21,14 @@ class Parser {
 		this.tokenEndIndex=this.tokens.length;
 		this.errorObj=null;
 
-		this.debugCode="";
-
 		this.branchCounter=1;
-
-		this.stringPool=[];
 
 		this.scopeIndex=0;
 		this.scopes=[[]];
 
 		this.allocScope=[0];
 		this.allocScopeIndex=0;
+		this.maxScopeDepth=0;
 
 		this.program=null;
 	}
@@ -65,6 +62,21 @@ class Parser {
 	}
 	
 	parse(externals){
+		
+		this.tokenIndex=0;
+		this.token=this.tokens[0];
+		this.tokenEndIndex=this.tokens.length;
+		this.errorObj=null;
+
+		this.branchCounter=1;
+
+		this.scopeIndex=0;
+		this.scopes=[[]];
+
+		this.allocScope=[0];
+		this.allocScopeIndex=0;
+		this.maxScopeDepth=0;
+
 		this.program = new Program();
 
 		for (let i=0;i<externals.length;i++){
@@ -82,9 +94,10 @@ class Parser {
 		if (!this.doBlock(null, null, false, false, true)){
 			//report default error message
 		}
-		this.program.addExit( Program.unlinkedNilLiteral() );
+		this.program.addExit( Program.unlinkedNilString() );
 		this.program.addLabel(pushGlobalScopeBranch);
 
+		this.program.addScopeDepth(this.maxScopeDepth);
 		if (this.allocScope[this.allocScopeIndex]){
 			this.program.addPushScope(this.allocScopeIndex, this.allocScope[this.allocScopeIndex]);
 		}
@@ -97,6 +110,7 @@ class Parser {
 	
 	pushAllocScope(){
 		this.allocScope[++this.allocScopeIndex]=0;
+		this.maxScopeDepth=Math.max(this.maxScopeDepth, this.allocScopeIndex);
 	}
 	popAllocScope(){
 		this.allocScope[this.allocScopeIndex--]=undefined;
@@ -433,7 +447,7 @@ class Parser {
 			return true;
 			
 		case TokenType.Nil:
-			this.program.addMov( Program.unlinkedReg("eax"), Program.unlinkedNilLiteral() );
+			this.program.addMov( Program.unlinkedReg("eax"), Program.unlinkedNilDouble() );
 			return this.match(TokenType.Nil);
 
 		case TokenType.True:
@@ -700,6 +714,8 @@ class Parser {
 		switch (this.token.type){
 			case TokenType.StringLiteral:
 				return true;
+			case TokenType.Nil:
+				return true;
 			case TokenType.Ident:
 				const identObj = this.getIdentity(this.token.value, false);
 				if (!identObj) return this.setError("Trying to use undefined "+this.token.value);
@@ -728,6 +744,9 @@ class Parser {
 			case TokenType.StringLiteral:
 				this.program.addMov( Program.unlinkedReg("eax"), Program.unlinkedStringLiteral(this.token.value) );
 				return this.match(TokenType.StringLiteral);
+			case TokenType.Nil:
+				this.program.addMov( Program.unlinkedReg("eax"), Program.unlinkedNilString() );
+				return this.match(TokenType.Nil);
 			case TokenType.Ident:
 				return this.doStringExpressionIdent();
 			case TokenType.LCase:
@@ -920,7 +939,7 @@ class Parser {
 			if (!this.doEitherExpression()) return false;
 			this.program.addExit( Program.unlinkedReg("eax") );
 		}else{
-			this.program.addExit( Program.unlinkedNilLiteral() );
+			this.program.addExit( Program.unlinkedNilString() );
 		}
 		return this.match(TokenType.LineDelim);
 	}
@@ -1085,8 +1104,19 @@ class Parser {
 		if (!this.doBlock(null, returnToBranch, true, true, true, type)) return false;
 
 		this.popScope();
-
-		this.program.addMov( Program.unlinkedReg("eax"), Program.unlinkedNilLiteral() );
+		switch (type){
+			case IdentityType.BoolFunction:
+				this.program.addMov( Program.unlinkedReg("eax"), Program.unlinkedNilBool() );
+				break;
+			case IdentityType.StringFunction:
+				this.program.addMov( Program.unlinkedReg("eax"), Program.unlinkedNilString() );
+				break;
+			case IdentityType.DoubleFunction:
+				this.program.addMov( Program.unlinkedReg("eax"), Program.unlinkedNilDouble() );
+				break;
+			default:
+				return this.setError("invalid return type from function "+name);
+		}
 		this.program.addLabel( returnToBranch );
 		this.program.addPopScope( this.allocScopeIndex );
 		this.program.addRet();
@@ -1121,20 +1151,30 @@ class Parser {
 
 	doReturn(returnToBranch, returnType){
 		if (!this.match(TokenType.Return)) return false;
-		if (this.token.type!==TokenType.LineDelim){
-			switch (returnType){
-				case IdentityType.DoubleFunction:
-				case IdentityType.BoolFunction:
+		switch (returnType){
+			case IdentityType.DoubleFunction:
+				if (this.token.type!==TokenType.LineDelim){
 					if (!this.doExpression()) return false;
-					break;
-				case IdentityType.StringFunction:
+				}else{
+					this.program.addMov( Program.unlinkedReg("eax"), Program.unlinkedNilDouble() );
+				}
+				break;
+			case IdentityType.BoolFunction:
+				if (this.token.type!==TokenType.LineDelim){
+					if (!this.doExpression()) return false;
+				}else{
+					this.program.addMov( Program.unlinkedReg("eax"), Program.unlinkedNilBool() );
+				}
+				break;
+			case IdentityType.StringFunction:
+				if (this.token.type!==TokenType.LineDelim){
 					if (!this.doStringExpression()) return false;
-					break;
-				default:
-					return this.setError("Expected return type of "+returnType.toString());
-			}
-		}else{
-			this.program.addMov( Program.unlinkedReg("eax"), Program.unlinkedNilLiteral() );
+				}else{
+					this.program.addMov( Program.unlinkedReg("eax"), Program.unlinkedNilString() );
+				}
+				break;
+			default:
+				return this.setError("Expected return type of "+returnType.toString());
 		}
 		this.program.addJmp( returnToBranch );
 		return this.match(TokenType.LineDelim);

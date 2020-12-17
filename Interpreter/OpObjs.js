@@ -39,6 +39,14 @@ class RegisterObj extends OpObj {
 		this._curValType=OpObjType.num;
 	}
 
+	getCopy(){
+		let newObj=new RegisterObj(this.name);
+		newObj._curValType=this._curValType;
+		newObj._value=this._value;
+		newObj._isConstant=this._isConstant;
+		return newObj;
+	}
+
 	setTo(obj){
 		if (obj instanceof OpObj === false) throw new Error("Tried to set register to invalid type");
 
@@ -83,7 +91,17 @@ class RegisterObj extends OpObj {
 
 class BoolObj extends OpObj {
 	constructor(name, initialVal=false, isConstant=false){
-		super(name, OpObjType.bool, Boolean(initialVal), isConstant);
+		super(name, OpObjType.bool, initialVal===null?null:Boolean(initialVal), isConstant);
+	}
+	
+	static null(){
+		const ret = new BoolObj(null, null, true);
+		ret._value=null;
+		return ret;
+	}
+	
+	getCopy(){
+		return new BoolObj(this.name, this._value, this._isConstant);
 	}
 
 	setTo(obj){
@@ -154,7 +172,17 @@ class BoolObj extends OpObj {
 
 class NumberObj extends OpObj {
 	constructor(name, initialVal=null, isConstant=false){
-		super(name, OpObjType.num, Number(initialVal), isConstant);
+		super(name, OpObjType.num,  initialVal===null?null:Number(initialVal), isConstant);
+	}
+	
+	static null(){
+		const ret = new NumberObj(null, null, true);
+		ret._value=null;
+		return ret;
+	}
+	
+	getCopy(){
+		return new NumberObj(this.name, this._value, this._isConstant);
 	}
 
 	setTo(obj){
@@ -225,7 +253,17 @@ class NumberObj extends OpObj {
 
 class StringObj extends OpObj {
 	constructor(name, initialVal="", isConstant=false){
-		super(name, OpObjType.string, String(initialVal), isConstant);
+		super(name, OpObjType.string,  initialVal===null?null:String(initialVal), isConstant);
+	}
+
+	static null(){
+		const ret = new StringObj(null, null, true);
+		ret._value=null;
+		return ret;
+	}
+
+	getCopy(){
+		return new StringObj(this.name, this._value, this._isConstant);
 	}
 
 	setTo(obj){
