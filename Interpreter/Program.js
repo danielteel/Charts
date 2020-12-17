@@ -2,58 +2,58 @@ const Utils = require("./Utils");
 const {OpObjType, OpObj, RegisterObj, StringObj, NumberObj, BoolObj} = require('./OpObjs');
 
 const OpCode = {
-	label:      1,
-	jmp:        2,
-	je:         3,
-	jne:        4,
-	test:       5,
-	cmp:        6,
-	se:         7,
-	sne:        8,
-	sa:         9,
-	sae:        10,
-	sb:         11,
-	sbe:        12,
-	exit:       13,
-	ceil:       14,
-	floor:      15,
-	abs:        16,
-	min:        17,
-	max:        18,
-	clamp:      19,
-	excall:     20,
-	call:       21,
-	ret:        22,
-	todouble:   23,
-	len:        24,
-	strcmp:     25,
-	stricmp:    26,
-	lcase:      27,
-	ucase:      28,
-	trim:       29,
-	substr:     30,
-	tostring:   31,
-	concat:     32,
-	double:     33,
-	bool:       34,
-	string:     35,
-	pushscope:  36,
-	popscope:   37,
-	push:       38,
-	pop:        39,
-	___unused:	40,
-	mov:        41,
-	and:        42,
-	or:         43,
-	add:        44,
-	sub:        45,
-	mul:        46,
-	div:        47,
-	mod:        48,
-	exponent:   49,
-	not:        50,
-	neg:        51,
-	scopedepth:	52
+	label:      Symbol("label"),
+	jmp:        Symbol("jmp"),
+	je:         Symbol("je"),
+	jne:        Symbol("jne"),
+	test:       Symbol("test"),
+	cmp:        Symbol("cmp"),
+	se:         Symbol("se"),
+	sne:        Symbol("sne"),
+	sa:         Symbol("sa"),
+	sae:        Symbol("sae"),
+	sb:         Symbol("sb"),
+	sbe:        Symbol("sbe"),
+	exit:       Symbol("exit"),
+	ceil:       Symbol("ceil"),
+	floor:      Symbol("floor"),
+	abs:        Symbol("abs"),
+	min:        Symbol("min"),
+	max:        Symbol("max"),
+	clamp:      Symbol("clamp"),
+	excall:     Symbol("excall"),
+	call:       Symbol("call"),
+	ret:        Symbol("ret"),
+	todouble:   Symbol("todouble"),
+	len:        Symbol("len"),
+	strcmp:     Symbol("strcmp"),
+	stricmp:    Symbol("stricmp"),
+	lcase:      Symbol("lcase"),
+	ucase:      Symbol("ucase"),
+	trim:       Symbol("trim"),
+	substr:     Symbol("substr"),
+	tostring:   Symbol("tostring"),
+	concat:     Symbol("concat"),
+	double:     Symbol("double"),
+	bool:       Symbol("bool"),
+	string:     Symbol("string"),
+	pushscope:  Symbol("pushscope"),
+	popscope:   Symbol("popscope"),
+	push:       Symbol("push"),
+	pop:        Symbol("pop"),
+	___unused:	Symbol("___unused"),
+	mov:        Symbol("mov"),
+	and:        Symbol("and"),
+	or:         Symbol("or"),
+	add:        Symbol("add"),
+	sub:        Symbol("sub"),
+	mul:        Symbol("mul"),
+	div:        Symbol("div"),
+	mod:        Symbol("mod"),
+	exponent:   Symbol("exponent"),
+	not:        Symbol("not"),
+	neg:        Symbol("neg"),
+	scopedepth:	Symbol("scopedepth")
 }
 
 const UnlinkedType={
@@ -177,197 +177,229 @@ class Program {
 		let flag_e=false;
 		let flag_a=false;
 		let flag_b=false;
-
-		while (notDone && eip<this.code.length){
-			let opcode=this.code[eip];
-			let obj0=null;
-			let obj1=null;
-			let obj2=null;
-			switch (opcode.type){
-				case OpCode.label:
-					//dont do nothing, essentially a NOP
-					break;
-				case OpCode.jmp:
-					eip=opcode.id;
-					break;
-				case OpCode.je:
-					if (flag_e) eip=opcode.id;
-					break;
-				case OpCode.jne:
-					if (!flag_e) eip=opcode.id;
-					break;
-				case OpCode.test:
-					flag_e=!link(opcode.obj0).eqaulTo(this.zero);
-					break;
-				case OpCode.cmp:
-					obj0=link(opcode.obj0);
-					obj1=link(opcode.obj1);
-					flag_e=obj0.eqaulTo(obj1);
-					flag_a=obj0.greaterThan(obj1);
-					flag_b=obj0.smallerThan(obj1);
-					break;
-				case OpCode.se:
-					link(opcode.obj0).setTo(flag_e?this.true:this.false);
-					break;
-				case OpCode.sne:
-					link(opcode.obj0).setTo(!flag_e?this.true:this.false);
-					break;
-				case OpCode.sa:
-					link(opcode.obj0).setTo(flag_a?this.true:this.false);
-					break;
-				case OpCode.sae:
-					link(opcode.obj0).setTo(flag_a||flag_e?this.true:this.false);
-					break;
-				case OpCode.sb:
-					link(opcode.obj0).setTo(flag_b?this.true:this.false);
-					break;
-				case OpCode.sbe:
-					link(opcode.obj0).setTo(flag_b||flag_e?this.true:this.false);
-					break;
-				case OpCode.exit:
-					return (link(opcode.obj0));
-				case OpCode.ceil:
-					obj0 = link(opcode.obj0);
-					obj0.setTo( new NumberObj(null, Math.ceil(obj0.value), true) );
-					break;
-				case OpCode.floor:
-					obj0 = link(opcode.obj0);
-					obj0.setTo( new NumberObj(null, Math.floor(obj0.value), true) );
-					break;
-				case OpCode.abs:
-					obj0 = link(opcode.obj0);
-					obj0.setTo( new NumberObj(null, Math.abs(obj0.value), true) );
-					break;
-				case OpCode.min:
-					obj0 = link(opcode.obj0);
-					obj1 = link(opcode.obj1);
-					obj0.setTo( new NumberObj(null, Math.min(obj0.value, obj1.value), true) );
-					break;
-				case OpCode.max:
-					obj0 = link(opcode.obj0);
-					obj1 = link(opcode.obj1);
-					obj0.setTo( new NumberObj(null, Math.max(obj0.value, obj1.value), true) );
-					break;
-				case OpCode.clamp:
-					obj0 = link(opcode.obj0);
-					obj1 = link(opcode.obj1);
-					obj2 = link(opcode.obj2);
-					obj0.setTo( new NumberObj(null, Math.min(Math.max(obj0.value, obj1.value), obj2.value), true) );
-					break;
-				case OpCode.excall:
-					externals[opcode.id]( () => stack.pop() );
-					break;
-				case OpCode.call:
-					callStack.push(eip+1);
-					eip=opcode.id;
-					break;
-				case OpCode.ret:
-					eip=callStack.pop();
-					break;
-				case OpCode.todouble:
-					obj0 = link(opcode.obj0);
-					obj0.setTo(new NumberObj(null, Number(obj0.value), true));
-					break;
-				case OpCode.len:
-					obj0 = link(opcode.obj0);
-					obj0.setTo(new NumberObj(null, obj0.value.length, true));
-					break;
-				case OpCode.strcmp:
-					obj0 = link(opcode.obj0);
-					obj1 = link(opcode.obj1);
-					obj0.setTo(new BoolObj(null, obj0.value===obj1.value, true));
-					break;
-				case OpCode.stricmp:
-					obj0 = link(opcode.obj0);
-					obj1 = link(opcode.obj1);
-					obj0.setTo(new BoolObj(null, obj0.value.toLowerCase()===obj1.value.toLowerCase(), true));
-					break;
-				case OpCode.lcase:
-					obj0 = link(opcode.obj0);
-					obj0.setTo( new StringObj(null, obj0.value.toLowerCase(), true) );
-					break;
-				case OpCode.ucase:
-					obj0 = link(opcode.obj0);
-					obj0.setTo( new StringObj(null, obj0.value.toUpperCase(), true) );
-					break;
-				case OpCode.trim:
-					obj0 = link(opcode.obj0);
-					obj0.setTo( new StringObj(null, obj0.value.trim(), true) );
-					break;
-				case OpCode.substr:
-					obj0 = link(opcode.obj0);
-					obj1 = link(opcode.obj1);
-					obj2 = link(opcode.obj2);
-					obj0.setTo( new StringObj(null, obj0.value.substr(obj1.value, obj2.value), true) );
-					break;
-				case OpCode.tostring:
-					obj0 = link(opcode.obj0);
-					obj0.setTo( new StringObj(null, String(obj0.value), true) );
-					break;
-				case OpCode.concat:
-					obj0 = link(opcode.obj0);
-					obj1 = link(opcode.obj1);
-					obj0.setTo( new StringObj(null, obj0.value+obj1.value, true) );
-					break;
-				case OpCode.double:
-					scopes[opcode.obj0.scope][scopes[opcode.obj0.scope].length-1][opcode.obj0.index]=new NumberObj(null, null, false);
-					break;
-				case OpCode.bool:
-					scopes[opcode.obj0.scope][scopes[opcode.obj0.scope].length-1][opcode.obj0.index]=new BoolObj(null, null, false);
-					break;
-				case OpCode.string:
-					scopes[opcode.obj0.scope][scopes[opcode.obj0.scope].length-1][opcode.obj0.index]=new StringObj(null, null, false);
-					break;
-				case OpCode.pushscope:
-					scopes[opcode.scope].push(new Array(opcode.size));
-					break;
-				case OpCode.popscope:
-					scopes[opcode.scope].pop();
-					break;
-				case OpCode.push:
-					stack.push(link(opcode.obj0).getCopy());
-					break;
-				case OpCode.pop:
-					link(opcode.obj0).setTo(stack.pop());
-					break;
-				case OpCode.___unused:
-					//place holder for something in the future
-					break;
-				case OpCode.mov:
-					link(opcode.obj0).setTo(link(opcode.obj1));
-					break;
-				case OpCode.and:
-					obj0=link(opcode.obj0);
-					obj0.setTo( new BoolObj(null, obj0.value && link(opcode.obj1).value, true) );
-					break;
-				case OpCode.or:
-					obj0=link(opcode.obj0);
-					obj0.setTo( new BoolObj(null, obj0.value || link(opcode.obj1).value, true) );
-					break;
-				case OpCode.add:
-					break;
-				case OpCode.sub:
-					break;
-				case OpCode.mul:
-					break;
-				case OpCode.div:
-					break;
-				case OpCode.mod:
-					break;
-				case OpCode.exponent:
-					break;
-				case OpCode.not:
-					break;
-				case OpCode.neg:
-					break;
-				case OpCode.scopedepth:
-					for (let i=0;i<opcode.size;i++){
-						scopes.push([[]]);
-					}
-					break;
+		try {
+			while (notDone && eip<this.code.length){
+				let opcode=this.code[eip];
+				//console.log(opcode);
+				let obj0=null;
+				let obj1=null;
+				let obj2=null;
+				switch (opcode.type){
+					case OpCode.label:
+						//dont do nothing, essentially a NOP
+						break;
+					case OpCode.jmp:
+						eip=opcode.id;
+						break;
+					case OpCode.je:
+						if (flag_e) eip=opcode.id;
+						break;
+					case OpCode.jne:
+						if (!flag_e) eip=opcode.id;
+						break;
+					case OpCode.test:
+						flag_e=!link(opcode.obj0).value;
+						break;
+					case OpCode.cmp:
+						obj0=link(opcode.obj0);
+						obj1=link(opcode.obj1);
+						flag_e=obj0.eqaulTo(obj1);
+						flag_a=obj0.greaterThan(obj1);
+						flag_b=obj0.smallerThan(obj1);
+						break;
+					case OpCode.se:
+						link(opcode.obj0).setTo(flag_e?this.true:this.false);
+						break;
+					case OpCode.sne:
+						link(opcode.obj0).setTo(!flag_e?this.true:this.false);
+						break;
+					case OpCode.sa:
+						link(opcode.obj0).setTo(flag_a?this.true:this.false);
+						break;
+					case OpCode.sae:
+						link(opcode.obj0).setTo(flag_a||flag_e?this.true:this.false);
+						break;
+					case OpCode.sb:
+						link(opcode.obj0).setTo(flag_b?this.true:this.false);
+						break;
+					case OpCode.sbe:
+						link(opcode.obj0).setTo(flag_b||flag_e?this.true:this.false);
+						break;
+					case OpCode.exit:
+						return (link(opcode.obj0).getCopy(true));
+					case OpCode.ceil:
+						obj0 = link(opcode.obj0);
+						obj0.setTo( new NumberObj(null, Math.ceil(obj0.value), true) );
+						break;
+					case OpCode.floor:
+						obj0 = link(opcode.obj0);
+						obj0.setTo( new NumberObj(null, Math.floor(obj0.value), true) );
+						break;
+					case OpCode.abs:
+						obj0 = link(opcode.obj0);
+						obj0.setTo( new NumberObj(null, Math.abs(obj0.value), true) );
+						break;
+					case OpCode.min:
+						obj0 = link(opcode.obj0);
+						obj1 = link(opcode.obj1);
+						obj0.setTo( new NumberObj(null, Math.min(obj0.value, obj1.value), true) );
+						break;
+					case OpCode.max:
+						obj0 = link(opcode.obj0);
+						obj1 = link(opcode.obj1);
+						obj0.setTo( new NumberObj(null, Math.max(obj0.value, obj1.value), true) );
+						break;
+					case OpCode.clamp:
+						obj0 = link(opcode.obj0);
+						obj1 = link(opcode.obj1);
+						obj2 = link(opcode.obj2);
+						obj0.setTo( new NumberObj(null, Math.min(Math.max(obj0.value, obj1.value), obj2.value), true) );
+						break;
+					case OpCode.excall:
+						this.eax.setTo(externals[opcode.id]( () => stack.pop() ));
+						break;
+					case OpCode.call:
+						callStack.push(eip+1);
+						eip=opcode.id;
+						break;
+					case OpCode.ret:
+						eip=callStack.pop();
+						continue;
+					case OpCode.todouble:
+						obj0 = link(opcode.obj0);
+						obj0.setTo(new NumberObj(null, Number(obj0.value), true));
+						break;
+					case OpCode.len:
+						obj0 = link(opcode.obj0);
+						obj0.setTo(new NumberObj(null, obj0.value.length, true));
+						break;
+					case OpCode.strcmp:
+						obj0 = link(opcode.obj0);
+						obj1 = link(opcode.obj1);
+						obj0.setTo(new BoolObj(null, obj0.value===obj1.value, true));
+						break;
+					case OpCode.stricmp:
+						obj0 = link(opcode.obj0);
+						obj1 = link(opcode.obj1);
+						obj0.setTo(new BoolObj(null, obj0.value.toLowerCase()===obj1.value.toLowerCase(), true));
+						break;
+					case OpCode.lcase:
+						obj0 = link(opcode.obj0);
+						obj0.setTo( new StringObj(null, obj0.value.toLowerCase(), true) );
+						break;
+					case OpCode.ucase:
+						obj0 = link(opcode.obj0);
+						obj0.setTo( new StringObj(null, obj0.value.toUpperCase(), true) );
+						break;
+					case OpCode.trim:
+						obj0 = link(opcode.obj0);
+						obj0.setTo( new StringObj(null, obj0.value.trim(), true) );
+						break;
+					case OpCode.substr:
+						obj0 = link(opcode.obj0);
+						obj1 = link(opcode.obj1);
+						obj2 = link(opcode.obj2);
+						obj0.setTo( new StringObj(null, obj0.value.substr(obj1.value, obj2.value), true) );
+						break;
+					case OpCode.tostring:
+						obj0 = link(opcode.obj0);
+						obj1 = link(opcode.obj1);
+						let val=obj0.value;
+						if (obj1.value!==null){
+							if (obj1.value>=0) val=Number(val).toFixed(obj1.value);
+							if (obj1.value<0){
+								const multiplier=10**Math.abs(obj1.value);
+								val=String(Math.round(val/multiplier)*multiplier);
+							}
+						}else{
+							val=String(val);
+						}
+						obj0.setTo( new StringObj(null, val, true) );
+						break;
+					case OpCode.concat:
+						obj0 = link(opcode.obj0);
+						obj1 = link(opcode.obj1);
+						obj0.setTo( new StringObj(null, obj0.value+obj1.value, true) );
+						break;
+					case OpCode.double:
+						scopes[opcode.obj0.scope][scopes[opcode.obj0.scope].length-1][opcode.obj0.index]=new NumberObj(null, null, false);
+						break;
+					case OpCode.bool:
+						scopes[opcode.obj0.scope][scopes[opcode.obj0.scope].length-1][opcode.obj0.index]=new BoolObj(null, null, false);
+						break;
+					case OpCode.string:
+						scopes[opcode.obj0.scope][scopes[opcode.obj0.scope].length-1][opcode.obj0.index]=new StringObj(null, null, false);
+						break;
+					case OpCode.pushscope:
+						scopes[opcode.scope].push(new Array(opcode.size));
+						break;
+					case OpCode.popscope:
+						scopes[opcode.scope].pop();
+						break;
+					case OpCode.push:
+						stack.push(link(opcode.obj0).getCopy());
+						break;
+					case OpCode.pop:
+						link(opcode.obj0).setTo(stack.pop());
+						break;
+					case OpCode.___unused:
+						//place holder for something in the future
+						break;
+					case OpCode.mov:
+						link(opcode.obj0).setTo(link(opcode.obj1));
+						break;
+					case OpCode.and:
+						obj0=link(opcode.obj0);
+						obj0.setTo( new BoolObj(null, obj0.value && link(opcode.obj1).value, true) );
+						break;
+					case OpCode.or:
+						obj0=link(opcode.obj0);
+						obj0.setTo( new BoolObj(null, obj0.value || link(opcode.obj1).value, true) );
+						break;
+					case OpCode.add:
+						obj0=link(opcode.obj0);
+						obj0.setTo( new NumberObj(null, obj0.value + link(opcode.obj1).value, true) );
+						break;
+					case OpCode.sub:
+						obj0=link(opcode.obj0);
+						obj0.setTo( new NumberObj(null, obj0.value - link(opcode.obj1).value, true) );
+						break;
+					case OpCode.mul:
+						obj0=link(opcode.obj0);
+						obj0.setTo( new NumberObj(null, obj0.value * link(opcode.obj1).value, true) );
+						break;
+					case OpCode.div:
+						obj0=link(opcode.obj0);
+						obj0.setTo( new NumberObj(null, obj0.value / link(opcode.obj1).value, true) );
+						break;
+					case OpCode.mod:
+						obj0=link(opcode.obj0);
+						obj0.setTo( new NumberObj(null, obj0.value % link(opcode.obj1).value, true) );
+						break;
+					case OpCode.exponent:
+						obj0=link(opcode.obj0);
+						obj0.setTo( new NumberObj(null, obj0.value ** link(opcode.obj1).value, true) );
+						break;
+					case OpCode.not:
+						obj0=link(opcode.obj0);
+						obj0.setTo( new BoolObj(null, !obj0.value, true) );
+						break;
+					case OpCode.neg:
+						obj0=link(opcode.obj0);
+						obj0.setTo( new NumberObj(null, 0-obj0.value, true) );
+						break;
+					case OpCode.scopedepth:
+						for (let i=0;i<opcode.size;i++){
+							scopes.push([[]]);
+						}
+						break;
+				}
+				eip++;
 			}
-			eip++;
+		} catch (err){
+			return Utils.newErrorObj(eip,"runtime error: "+err.message);
 		}
+		return null;
 	}
 
 	addRet          ()					{ this.code.push( {type: OpCode.ret} ); }
@@ -394,7 +426,6 @@ class Program {
 	addLCase        (obj0)				{ this.code.push( {type: OpCode.lcase,		obj0: obj0} ); }
 	addUCase        (obj0)				{ this.code.push( {type: OpCode.ucase,		obj0: obj0} ); }
 	addTrim         (obj0)				{ this.code.push( {type: OpCode.trim,		obj0: obj0} ); }
-	addToString     (obj0)				{ this.code.push( {type: OpCode.tostring,	obj0: obj0} ); }
 	addDouble       (obj0)				{ this.code.push( {type: OpCode.double,		obj0: obj0} ); }
 	addBool         (obj0)				{ this.code.push( {type: OpCode.bool,		obj0: obj0} ); }
 	addString       (obj0)				{ this.code.push( {type: OpCode.string,		obj0: obj0} ); }
@@ -403,7 +434,8 @@ class Program {
 	addNot          (obj0)				{ this.code.push( {type: OpCode.not,		obj0: obj0} ); }
 	addNeg          (obj0)				{ this.code.push( {type: OpCode.neg,		obj0: obj0} ); }
 	addPopScope     (scope)				{ this.code.push( {type: OpCode.popscope,	scope: scope} ); }
-	addCmp          (obj0, obj1)		{ this.code.push( {type: OpCode.test,		obj0: obj0, obj1: obj1} ); }
+	addToString     (obj0, obj1)		{ this.code.push( {type: OpCode.tostring,	obj0: obj0, obj1: obj1} ); }
+	addCmp          (obj0, obj1)		{ this.code.push( {type: OpCode.cmp,		obj0: obj0, obj1: obj1} ); }
 	addConcat       (obj0, obj1)		{ this.code.push( {type: OpCode.concat,		obj0: obj0, obj1: obj1} ); }
 	addStrCmp       (obj0, obj1)		{ this.code.push( {type: OpCode.strcmp,		obj0: obj0, obj1: obj1} ); }
 	addStrICmp      (obj0, obj1)		{ this.code.push( {type: OpCode.stricmp,	obj0: obj0, obj1: obj1} ); }

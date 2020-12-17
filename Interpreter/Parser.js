@@ -1272,6 +1272,8 @@ class Parser {
 
 		let hasCurlys = false;
 
+		if (!ifNeedsCurlys && !this.isNotEnd()) return true;
+
 		if (ifNeedsCurlys || this.token.type===TokenType.LeftCurly){
 			if (!this.match(TokenType.LeftCurly)) return false;
 			hasCurlys=true;

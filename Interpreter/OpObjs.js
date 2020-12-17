@@ -39,8 +39,11 @@ class RegisterObj extends OpObj {
 		this._curValType=OpObjType.num;
 	}
 
-	getCopy(){
-		let newObj=new RegisterObj(this.name);
+	getCopy(asNative){
+		if (asNative){
+			return this.getNativeObj();
+		}
+		let newObj=new RegisterObj(this.name+"Copy");
 		newObj._curValType=this._curValType;
 		newObj._value=this._value;
 		newObj._isConstant=this._isConstant;
