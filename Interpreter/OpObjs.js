@@ -114,6 +114,9 @@ class BoolObj extends OpObj {
 		let type=obj._objType;
 		if (type===OpObjType.register) type=obj._curValType;
 
+		if (obj._value===null && this._value!==null) return false;
+		if (this._value===null && obj._value!==null) return false;
+
 		switch (type){
 		case OpObjType.bool:
 			this._value=obj._value;
@@ -124,6 +127,7 @@ class BoolObj extends OpObj {
 		default:
 			throw new Error("Tried to set bool to unknown type");
 		}
+		if (!isFinite(this._value)) this._value=null;
 	}
 	eqaulTo(obj){
 		let type=obj._objType;
@@ -205,11 +209,15 @@ class NumberObj extends OpObj {
 			default:
 				throw new Error("Tried to set number to invalid type");
 		}
+		
+		if (!isFinite(this._value)) this._value=null;
 	}
 	eqaulTo(obj){
 		let type=obj._objType;
 		if (type===OpObjType.register) type=obj._curValType;
 
+		if (obj._value===null && this._value!==null) return false;
+		if (this._value===null && obj._value!==null) return false;
 		switch (type){
 			case OpObjType.bool:
 				return this._value===Number(obj._value);
@@ -289,13 +297,16 @@ class StringObj extends OpObj {
 		let type=obj._objType;
 		if (type===OpObjType.register) type=obj._curValType;
 
+		if (obj._value===null && this._value!==null) return false;
+		if (this._value===null && obj._value!==null) return false;
+
 		switch (type){
 			case OpObjType.string:
 				return this._value===obj._value;
 			default:
 				throw new Error("Tried to do comparison to invalid type");
 		}
-	}    
+	}
 	notEqualTo(obj){
 		return !this.eqaulTo(obj);
 	}

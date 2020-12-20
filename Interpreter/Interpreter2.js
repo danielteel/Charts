@@ -102,11 +102,16 @@ class Interpreter {
             return errorRecvd;
         }
 
-        console.log("Return value:"+exitObject.value);
+        console.log("Exit value:"+exitObject.value);
         return exitObject;
     }
 }
 
+
+
+
+
+//Example usage below
 function print(popFn){
     let str=popFn();
 
@@ -114,17 +119,22 @@ function print(popFn){
     return new BoolObj(null, true, false);
 }
 
-const code=`exit !(print(nil)+1);`;
+const code=`
+    this=this+1;
+    print(tostring(this,null));
+`;
 
-let importThis = new NumberObj("this", true, false);
+let importThis = new NumberObj("this", 17, false);
 
-let interp=new Interpreter();
+let interpreter=new Interpreter();
 
-console.log(interp.runCode(code, importThis, 
-                     Interpreter.funcDef("print", print, "bool", "string"),
-              ));
+interpreter.runCode( 
+                    code,                                                   //The code to run
+                    importThis,                                             //Importing a string variable
+                    Interpreter.funcDef("print", print, "bool", "string"),  //importing print (returns a bool, accepts a string)
+                   );
 
-console.log(importThis);
+console.log("importThis.value = "+importThis.value);
 
 
 module.exports=Interpreter;

@@ -343,8 +343,8 @@ class Parser {
 	}
 
 	doIdent(){
-		let varName=this.token.value;
-		let identObj = this.getIdentity(varName);
+		const varName=this.token.value;
+		const identObj = this.getIdentity(varName);
 		if (!identObj) return this.setError("Tried to access undefined '"+varName+"'");
 
 		switch (identObj.type){
@@ -356,11 +356,59 @@ class Parser {
 				this.program.addMov( Program.unlinkedReg("eax"), Program.unlinkedBool(identObj.scope, identObj.index) );
 				return this.match(TokenType.Ident);
 
+			
 			case IdentityType.DoubleFunction:
 			case IdentityType.BoolFunction:
 				return this.doFuncCall(true, true, false);
 		}
 		return this.setError("Invalid type in expression "+varName+":"+identObj.type.toString());
+	}
+	
+	doIsNil(){
+		if (!this.match(TokenType.IsNil)) return false;
+		const varName=this.token.value;
+		const identObj = this.getIdentity(varName);
+		if (!identObj) return this.setError("Tried to access undefined '"+varName+"'");
+
+		switch (identObj.type){
+			case IdentityType.Double:
+				this.program.addMov( Program.unlinkedReg("eax"), Program.unlinkedDouble(identObj.scope, identObj.index) );
+				this.program.addCmp( Program.unlinkedReg("eax"), Program.unlinkedNilDouble() );
+				this.program.addSNE( Program.unlinkedReg("eax") );
+				return this.match(TokenType.Ident);
+
+			case IdentityType.Bool:
+				this.program.addMov( Program.unlinkedReg("eax"), Program.unlinkedBool(identObj.scope, identObj.index) );
+				this.program.addCmp( Program.unlinkedReg("eax"), Program.unlinkedNilBool() );
+				this.program.addSNE( Program.unlinkedReg("eax") );
+				return this.match(TokenType.Ident);
+
+			case IdentityType.String:
+				this.program.addMov( Program.unlinkedReg("eax"), Program.unlinkedString(identObj.scope, identObj.index) );
+				this.program.addStrCmp( Program.unlinkedReg("eax"), Program.unlinkedNilString() );
+				this.program.addNot( Program.unlinkedReg("eax") );
+				return this.match(TokenType.Ident);
+			
+			case IdentityType.DoubleFunction:
+				if (!this.doFuncCall(false, true, false)) return false;
+				this.program.addCmp( Program.unlinkedReg("eax"), Program.unlinkedNilDouble() );
+				this.program.addSNE( Program.unlinkedReg("eax") );
+				return true;
+
+			case IdentityType.BoolFunction:
+				if (!this.doFuncCall(true, false, false)) return false;
+				this.program.addCmp( Program.unlinkedReg("eax"), Program.unlinkedNilBool() );
+				this.program.addSNE( Program.unlinkedReg("eax") );
+				return true;
+
+			case IdentityType.StringFunction:
+				if (!this.doFuncCall(false, false, true)) return false;
+				this.program.addStrCmp( Program.unlinkedReg("eax"), Program.unlinkedNilString() );
+				this.program.addNot( Program.unlinkedReg("eax") );
+				return true;
+
+		}
+		return this.setError("Invalid type in isnil "+varName+":"+identObj.type.toString());
 	}
 
 
@@ -418,13 +466,15 @@ class Parser {
 	doFactor(){
 		switch (this.token.type){        
 		case TokenType.DoubleLiteral:
-
 			this.program.addMov( Program.unlinkedReg("eax"), Program.unlinkedDoubleLiteral(this.token.value) );
 
 			return this.match(TokenType.DoubleLiteral);
 			
 		case TokenType.Ident:
 			return this.doIdent();
+		
+		case TokenType.IsNil:
+			return this.doIsNil();
 			
 		case TokenType.LeftParen:
 			if (!this.match(TokenType.LeftParen)) return false;
@@ -474,7 +524,7 @@ class Parser {
 		case TokenType.Len:
 			return this.doLen();
 		case TokenType.StrCmp:
-			return this.doStrcmp();
+			return this.doStrCmp();
 		case TokenType.StrICmp:
 			return this.doStrICmp();
 
@@ -687,7 +737,6 @@ class Parser {
 
 		if (!this.match(TokenType.Comma)) return false;
 		if (!this.doExpression()) return false;
-		this.program.addPush( Program.unlinkedReg("eax") );
 		this.program.addMov( Program.unlinkedReg("ecx"), Program.unlinkedReg("eax") );
 		this.program.addPop( Program.unlinkedReg("ebx") );
 		this.program.addPop( Program.unlinkedReg("eax") );

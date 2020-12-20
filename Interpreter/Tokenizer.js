@@ -34,6 +34,8 @@ const TokenType = {
 	Mod: Symbol("%"),
 	Exponent: Symbol("^"),
 
+	IsNil: Symbol("?"),
+
 	Assignment: Symbol("="),
 	Equals: Symbol("=="),
 	NotEquals: Symbol("!="),
@@ -256,7 +258,9 @@ class Tokenizer {
 				return this.addToken(TokenType.True);
 			case "false":
 				return this.addToken(TokenType.False);
+				
 			case "nil":
+			case "null":
 				return this.addToken(TokenType.Nil);
 		}
 		return this.addToken(TokenType.Ident, name);
@@ -280,6 +284,9 @@ class Tokenizer {
 						return this.addToken(TokenType.LineDelim);
 					case ',':
 						return this.addToken(TokenType.Comma);
+
+					case '?':
+						return this.addToken(TokenType.IsNil);
 
 					case '{':
 						return this.addToken(TokenType.LeftCurly);

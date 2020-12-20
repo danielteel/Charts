@@ -229,30 +229,40 @@ class Program {
 						return (link(opcode.obj0).getCopy(true));
 					case OpCode.ceil:
 						obj0 = link(opcode.obj0);
+						if (obj0.value===null) throw Error("tried to do ceil on null value");						
 						obj0.setTo( new NumberObj(null, Math.ceil(obj0.value), true) );
 						break;
 					case OpCode.floor:
 						obj0 = link(opcode.obj0);
+						if (obj0.value===null) throw Error("tried to do floor on null value");	
 						obj0.setTo( new NumberObj(null, Math.floor(obj0.value), true) );
 						break;
 					case OpCode.abs:
 						obj0 = link(opcode.obj0);
+						if (obj0.value===null) throw Error("tried to do abs on null value");	
 						obj0.setTo( new NumberObj(null, Math.abs(obj0.value), true) );
 						break;
 					case OpCode.min:
 						obj0 = link(opcode.obj0);
 						obj1 = link(opcode.obj1);
+						if (obj0.value===null) throw Error("tried to do min on null value");	
+						if (obj1.value===null) throw Error("tried to do min on null value");	
 						obj0.setTo( new NumberObj(null, Math.min(obj0.value, obj1.value), true) );
 						break;
 					case OpCode.max:
 						obj0 = link(opcode.obj0);
 						obj1 = link(opcode.obj1);
+						if (obj0.value===null) throw Error("tried to do max on null value");	
+						if (obj1.value===null) throw Error("tried to do max on null value");	
 						obj0.setTo( new NumberObj(null, Math.max(obj0.value, obj1.value), true) );
 						break;
 					case OpCode.clamp:
 						obj0 = link(opcode.obj0);
 						obj1 = link(opcode.obj1);
 						obj2 = link(opcode.obj2);
+						if (obj0.value===null) throw Error("tried to do clamp on null value");	
+						if (obj1.value===null) throw Error("tried to do clamp on null value");	
+						if (obj2.value===null) throw Error("tried to do clamp on null value");	
 						obj0.setTo( new NumberObj(null, Math.min(Math.max(obj0.value, obj1.value), obj2.value), true) );
 						break;
 					case OpCode.excall:
@@ -267,10 +277,12 @@ class Program {
 						continue;
 					case OpCode.todouble:
 						obj0 = link(opcode.obj0);
+						if (obj0.value===null) throw Error("tried to convert null to double");	
 						obj0.setTo(new NumberObj(null, Number(obj0.value), true));
 						break;
 					case OpCode.len:
 						obj0 = link(opcode.obj0);
+						if (obj0.value===null) throw Error("tried to get length of null string");	
 						obj0.setTo(new NumberObj(null, obj0.value.length, true));
 						break;
 					case OpCode.strcmp:
@@ -285,25 +297,32 @@ class Program {
 						break;
 					case OpCode.lcase:
 						obj0 = link(opcode.obj0);
+						if (obj0.value===null) throw Error("tried to set null string to lower case");
 						obj0.setTo( new StringObj(null, obj0.value.toLowerCase(), true) );
 						break;
 					case OpCode.ucase:
 						obj0 = link(opcode.obj0);
+						if (obj0.value===null) throw Error("tried to set null string to upper case");
 						obj0.setTo( new StringObj(null, obj0.value.toUpperCase(), true) );
 						break;
 					case OpCode.trim:
 						obj0 = link(opcode.obj0);
+						if (obj0.value===null) throw Error("tried to trim null string");
 						obj0.setTo( new StringObj(null, obj0.value.trim(), true) );
 						break;
 					case OpCode.substr:
 						obj0 = link(opcode.obj0);
 						obj1 = link(opcode.obj1);
 						obj2 = link(opcode.obj2);
+						if (obj0.value===null) throw Error("tried to get substring of null string");
+						if (obj1.value===null) throw Error("tried to get substring with null index");
+						if (obj2.value===null) throw Error("tried to get substring with null length");
 						obj0.setTo( new StringObj(null, obj0.value.substr(obj1.value, obj2.value), true) );
 						break;
 					case OpCode.tostring:
 						obj0 = link(opcode.obj0);
 						obj1 = link(opcode.obj1);
+						if (obj0.value===null) throw Error("tried to convert null to string");
 						let val=obj0.value;
 						if (obj1.value!==null){
 							if (obj1.value>=0) val=Number(val).toFixed(obj1.value);
@@ -319,6 +338,8 @@ class Program {
 					case OpCode.concat:
 						obj0 = link(opcode.obj0);
 						obj1 = link(opcode.obj1);
+						if (obj0.value===null) throw Error("tried to concat null to string");
+						if (obj1.value===null) throw Error("tried to concat string to null");
 						obj0.setTo( new StringObj(null, obj0.value+obj1.value, true) );
 						break;
 					case OpCode.double:
@@ -358,27 +379,37 @@ class Program {
 						break;
 					case OpCode.add:
 						obj0=link(opcode.obj0);
-						obj0.setTo( new NumberObj(null, obj0.value + link(opcode.obj1).value, true) );
+						obj1=link(opcode.obj1);
+						if (obj0.value===null || obj1.value===null) throw Error("tried to add null");
+						obj0.setTo( new NumberObj(null, obj0.value + obj1.value, true) );
 						break;
 					case OpCode.sub:
 						obj0=link(opcode.obj0);
-						obj0.setTo( new NumberObj(null, obj0.value - link(opcode.obj1).value, true) );
+						obj1=link(opcode.obj1);
+						if (obj0.value===null || obj1.value===null) throw Error("tried to sub null");
+						obj0.setTo( new NumberObj(null, obj0.value - obj1.value, true) );
 						break;
 					case OpCode.mul:
 						obj0=link(opcode.obj0);
-						obj0.setTo( new NumberObj(null, obj0.value * link(opcode.obj1).value, true) );
+						obj0.setTo( new NumberObj(null, obj0.value * obj1.value, true) );
 						break;
 					case OpCode.div:
 						obj0=link(opcode.obj0);
-						obj0.setTo( new NumberObj(null, obj0.value / link(opcode.obj1).value, true) );
+						obj1=link(opcode.obj1);
+						if (obj0.value===null || obj1.value===null) throw Error("tried to div null");
+						obj0.setTo( new NumberObj(null, obj0.value / obj1.value, true) );
 						break;
 					case OpCode.mod:
 						obj0=link(opcode.obj0);
-						obj0.setTo( new NumberObj(null, obj0.value % link(opcode.obj1).value, true) );
+						obj1=link(opcode.obj1);
+						if (obj0.value===null || obj1.value===null) throw Error("tried to mod null");
+						obj0.setTo( new NumberObj(null, obj0.value % obj1.value, true) );
 						break;
 					case OpCode.exponent:
 						obj0=link(opcode.obj0);
-						obj0.setTo( new NumberObj(null, obj0.value ** link(opcode.obj1).value, true) );
+						obj1=link(opcode.obj1);
+						if (obj0.value===null || obj1.value===null) throw Error("tried to ^ null");
+						obj0.setTo( new NumberObj(null, obj0.value ** obj1.value, true) );
 						break;
 					case OpCode.not:
 						obj0=link(opcode.obj0);
@@ -386,6 +417,7 @@ class Program {
 						break;
 					case OpCode.neg:
 						obj0=link(opcode.obj0);
+						if (obj0.value===null) throw Error("tried to neg null");
 						obj0.setTo( new NumberObj(null, 0-obj0.value, true) );
 						break;
 					case OpCode.scopedepth:
